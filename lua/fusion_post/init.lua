@@ -38,13 +38,13 @@ function M.setup(opts)
         end
     end, { nargs = "?" })
         vim.api.nvim_create_user_command("FusionEncrypt", function()
-        local security = require("fusion_post.security")
-        security.encrypt_post(M.options)
+        local encrypt = require("fusion_post.encrypt")
+        encrypt.encrypt_post(M.options)
     end, {})
 
     vim.api.nvim_create_user_command("FusionDecrypt", function()
-        local security = require("fusion_post.security")
-        security.decrypt_post(M.options)
+        local decrypt = require("fusion_post.encrypt")
+        decrypt.decrypt_post(M.options)
     end, {})
 end
 
