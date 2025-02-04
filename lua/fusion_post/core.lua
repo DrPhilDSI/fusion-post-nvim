@@ -2,7 +2,7 @@ local M = {}
 
 local ui = require("fusion_post.ui")
 
-function M.run_post_processor(opts)
+function M.run_post_processor(selected_file,opts)
     local post_exe_path = opts.post_exe_path
     local cnc_folder = vim.fn.expand(opts.cnc_folder)
 
@@ -10,9 +10,6 @@ function M.run_post_processor(opts)
         print("Error: post.exe path is invalid. Set it in your LazyVim config.")
         return
     end
-
-    local selected_file = ui.select_cnc_file(cnc_folder)
-    if not selected_file then return end
 
     local post_processor = vim.fn.expand("%:p")
     if not post_processor:match("%.cps$") then
