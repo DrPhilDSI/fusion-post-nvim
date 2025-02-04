@@ -44,7 +44,6 @@ function M.open_preview(file, filetype)
     vim.bo.swapfile = false
     vim.bo.bufhidden = "wipe"
     vim.bo.readonly = true
-    vim.cmd("set filetype=" .. filetype)
 end
 
 return M
