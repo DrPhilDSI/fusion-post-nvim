@@ -1,6 +1,6 @@
 local M = {}
 
-function M.select_cnc_file(cnc_folder)
+function M.select_cnc_file(cnc_folder, callback)
     local files = vim.fn.glob(cnc_folder .. "*.cnc", false, true)
 
     if #files == 0 then
@@ -8,12 +8,16 @@ function M.select_cnc_file(cnc_folder)
         return nil
     end
 
-    local selected = nil
-    vim.ui.select(files, { prompt = "Select CNC File" }, function(choice)
-        selected = choice
-    end)
+    print("UI File Selection Started...")  -- Debugging
 
-    return selected
+    vim.ui.select(files, { prompt = "Select CNC File" }, function(choice)
+        if choice then
+            print("User selected: " .. choice)  -- Debugging
+            callback(choice)  -- This should call `run_post_processor()`
+        else
+            print("User cancelled file selection")  -- Debugging
+        end
+    end)
 end
 
 function M.open_preview(file, filetype)
