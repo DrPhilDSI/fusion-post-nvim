@@ -37,6 +37,15 @@ function M.setup(opts)
             print("Current post.exe path: " .. M.options.post_exe_path)
         end
     end, { nargs = "?" })
+        vim.api.nvim_create_user_command("FusionEncrypt", function()
+        local security = require("fusion_post.security")
+        security.encrypt_post(M.options)
+    end, {})
+
+    vim.api.nvim_create_user_command("FusionDecrypt", function()
+        local security = require("fusion_post.security")
+        security.decrypt_post(M.options)
+    end, {})
 end
 
 return M
