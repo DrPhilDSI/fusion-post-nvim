@@ -1,5 +1,6 @@
 local M = {}
 
+
 function M.select_cnc_file(cnc_folder, callback)
     local files = vim.fn.glob(cnc_folder .. "*.cnc", false, true)
 
@@ -13,7 +14,11 @@ function M.select_cnc_file(cnc_folder, callback)
     vim.ui.select(files, { prompt = "Select CNC File" }, function(choice)
         if choice then
             print("User selected: " .. choice)  -- Debugging
-            callback(choice)  -- This should call `run_post_processor()`
+            if type(callback) == "function" then
+                callback(choice)  -- **Only call if callback is valid**
+            else
+                print("Error: No valid callback function provided!")  -- Debugging
+            end
         else
             print("User cancelled file selection")  -- Debugging
         end

@@ -22,7 +22,11 @@ function M.setup(opts)
 
     -- Register commands
     vim.api.nvim_create_user_command("FusionPost", function()
-        require("fusion_post.core").run_post_processor(M.options)
+        local core = require("fusion_post.core")
+        local ui = require("fusion_post.ui")
+        ui.select_cnc_file(M.options.cnc_folder, function(selected_file)
+            core.run_post_processor(selected_file, M.options)
+        end)
     end, {})
 
     vim.api.nvim_create_user_command("FusionPostConfig", function(opts)
