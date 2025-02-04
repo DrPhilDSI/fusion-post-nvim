@@ -52,11 +52,12 @@ function M.decrypt_post(opts)
 
     -- Run command
     local result = vim.fn.system(cmd)
+    local exit_code = vim.v.shell_error
 
-    if result == 0 then
-        print("Decryption successful: " .. post_path)
-    else
+    if exit_code ~= 0 then
         print("Decryption failed.")
+    else
+        print("Decryption successful: " .. post_path)
     end
 end
 
