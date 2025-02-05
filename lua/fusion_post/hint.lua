@@ -47,13 +47,10 @@ function M.extract_function_hints(nc_file, cps_file)
 	for line in file:lines() do
 		line_number = line_number + 1
 
-		-- Detect `!DEBUG` lines and extract the line number from the `.cps` file
-		local post_line = line:match("!DEBUG: %d+ .* ([%w_]+%.cps):(%d+)")
-		print(post_line)
-		if post_line then
-			local cps_line_number = tonumber(post_line)
-			local function_name = function_definitions[cps_line_number]
+		local cps_line_number = tonumber(line:match("!DEBUG: %d+ .*%:(%d+)"))
 
+		if cps_line_number then
+			local function_name = function_definitions[cps_line_number]
 			if function_name then
 				-- Store function call, limiting depth to 3
 				table.insert(function_stack, function_name)
