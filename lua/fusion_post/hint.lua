@@ -101,13 +101,18 @@ function M.add_function_hints(cps_file, nc_file)
 		return
 	end
 
-	M.hint_data[bufnr] = hints
+	local total_lines = vim.api.nvim_buf_line_count(bufnr)
 
 	for line_number, function_name in pairs(hints) do
-		vim.api.nvim_buf_set_extmark(bufnr, vim.api.nvim_create_namespace("FusionPostHints"), line_number - 1, 0, {
-			virt_text = { { " → " .. function_name, "Comment" } },
-			virt_text_pos = "eol",
-		})
+		-- 🛠️ Ensure the line number is within valid range
+		if line_number <= total_lines then
+			vim.api.nvim_buf_set_extmark(bufnr, vim.api.nvim_create_namespace("FusionPostHints"), line_number - 1, 0, {
+				virt_text = { { " → " .. function_name, "Comment" } },
+				virt_text_pos = "eol",
+			})
+		else
+			print(string.format("Skipping invalid hint line: %d (out of range)", line_number))
+		end
 	end
 
 	print("Function hints added to NC output (Max Depth: 3).")
