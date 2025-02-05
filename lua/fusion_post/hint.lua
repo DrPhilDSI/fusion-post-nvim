@@ -62,10 +62,12 @@ function M.extract_function_hints(nc_file, cps_file)
 	local last_function = nil -- Track the last function assigned
 
 	for line in file:lines() do
-		local function_stack = {} -- Stores up to 3 function calls
 		nc_line_number = nc_line_number + 1
 
-		-- Extract only the CPS line number from the `!DEBUG` lines
+		-- 🛠️ Each NC line gets its own function stack (reset per line)
+		local function_stack = {}
+
+		-- Extract the `.cps` file line number from `!DEBUG` lines
 		local cps_line_number = tonumber(line:match("!DEBUG: %d+ .*%:(%d+)"))
 
 		if cps_line_number then
@@ -73,18 +75,20 @@ function M.extract_function_hints(nc_file, cps_file)
 			local function_name = find_closest_function(cps_line_number, function_definitions, sorted_line_numbers)
 
 			if function_name and function_name ~= last_function then
-				print(string.format("Function name: %s", function_name))
 				last_function = function_name -- Avoid duplicate hints
 				table.insert(function_stack, function_name)
-				if #function_stack > 3 then
-					table.remove(function_stack, 1) -- Limit to 3 deep
-				end
 			end
 		end
 
 		-- If it's an actual NC command (not debug), attach the call stack to the correct `.nc` line
 		if not line:match("!DEBUG") and line:match("%u") then
 			if #function_stack > 0 then
+				-- Limit stack depth to 3 before storing
+				while #function_stack > 3 do
+					table.remove(function_stack, 1)
+				end
+
+				-- Store in hints
 				hints[nc_line_number] = table.concat(function_stack, " → ")
 			end
 		end
