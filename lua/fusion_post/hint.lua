@@ -75,16 +75,9 @@ function M.extract_function_hints(nc_file, cps_file)
 end
 
 -- 🛠️ Attach function hints as virtual text in Neovim
-function M.add_function_hints(nc_file)
+function M.add_function_hints(cps_file, nc_file)
 	local bufnr = vim.fn.bufnr("%")
 	if bufnr == -1 then
-		return
-	end
-
-	-- Get currently open `.cps` file
-	local cps_file = vim.fn.expand("%:p")
-	if not cps_file:match("%.cps$") then
-		print("Error: No valid CPS file is open.")
 		return
 	end
 
