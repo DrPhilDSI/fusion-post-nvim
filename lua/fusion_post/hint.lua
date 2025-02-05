@@ -2,14 +2,14 @@ local M = {}
 
 M.hint_data = {}
 
--- 🛠️ Extract function names and their line numbers from the `.cps` file
 function M.extract_function_definitions(cps_file)
 	local functions = {}
+	local sorted_line_numbers = {} -- Stores sorted function line numbers
 
 	local file = io.open(cps_file, "r")
 	if not file then
 		print("Error: Cannot open CPS file for function extraction.")
-		return {}
+		return {}, {}
 	end
 
 	local line_number = 0
@@ -19,21 +19,36 @@ function M.extract_function_definitions(cps_file)
 		-- Look for function definitions (e.g., `function writeWCS()`)
 		local function_name = line:match("function%s+([%w_]+)%s*%(")
 		if function_name then
-			functions[tonumber(line_number)] = function_name
+			functions[line_number] = function_name
+			table.insert(sorted_line_numbers, line_number)
 		end
 	end
 
 	file:close()
-	return functions
+	table.sort(sorted_line_numbers) -- Ensure line numbers are in ascending order
+	return functions, sorted_line_numbers
 end
 
--- 🛠️ Extract function mappings from `!DEBUG` lines and match with `.cps` functions
+local function find_closest_function(cps_line_number, function_definitions, sorted_line_numbers)
+	local closest_function = nil
+
+	for _, defined_line in ipairs(sorted_line_numbers) do
+		if defined_line <= cps_line_number then
+			closest_function = function_definitions[defined_line]
+		else
+			break -- Stop once we pass the target line
+		end
+	end
+
+	return closest_function
+end
+
 function M.extract_function_hints(nc_file, cps_file)
 	print("Extracting Hints")
 	local hints = {}
 
 	-- Get function mappings from the `.cps` file
-	local function_definitions = M.extract_function_definitions(cps_file)
+	local function_definitions, sorted_line_numbers = M.extract_function_definitions(cps_file)
 
 	local file = io.open(nc_file, "r")
 	if not file then
@@ -50,7 +65,7 @@ function M.extract_function_hints(nc_file, cps_file)
 		local cps_line_number = tonumber(line:match("!DEBUG: %d+ .*%:(%d+)"))
 
 		if cps_line_number then
-			local function_name = function_definitions[cps_line_number]
+			local function_name = find_closest_function(cps_line_number, function_definitions, sorted_line_numbers)
 			if function_name then
 				-- Store function call, limiting depth to 3
 				table.insert(function_stack, function_name)
