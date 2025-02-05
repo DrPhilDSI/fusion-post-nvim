@@ -2,9 +2,10 @@ local M = {}
 
 M.hint_data = {}
 
+-- 🛠️ Extract function names and their line numbers from the `.cps` file
 function M.extract_function_definitions(cps_file)
 	local functions = {}
-	local sorted_line_numbers = {} -- Stores sorted function line numbers
+	local sorted_line_numbers = {}
 
 	local file = io.open(cps_file, "r")
 	if not file then
@@ -25,10 +26,11 @@ function M.extract_function_definitions(cps_file)
 	end
 
 	file:close()
-	table.sort(sorted_line_numbers) -- Ensure line numbers are in ascending order
+	table.sort(sorted_line_numbers)
 	return functions, sorted_line_numbers
 end
 
+-- 🛠️ Find the closest function BEFORE a given line number
 local function find_closest_function(cps_line_number, function_definitions, sorted_line_numbers)
 	local closest_function = nil
 
@@ -43,8 +45,8 @@ local function find_closest_function(cps_line_number, function_definitions, sort
 	return closest_function
 end
 
+-- 🛠️ Extract function hints from `!DEBUG` lines and correctly match to `.nc` lines
 function M.extract_function_hints(nc_file, cps_file)
-	print("Extracting Hints")
 	local hints = {}
 
 	-- Get function mappings from the `.cps` file
@@ -57,29 +59,31 @@ function M.extract_function_hints(nc_file, cps_file)
 	end
 
 	local function_stack = {} -- Stores up to 3 function calls
-	local line_number = 0
+	local nc_line_number = 0 -- Track the current NC file line
 
 	for line in file:lines() do
-		line_number = line_number + 1
+		nc_line_number = nc_line_number + 1
 
+		-- Extract only the CPS line number from the `!DEBUG` lines
 		local cps_line_number = tonumber(line:match("!DEBUG: %d+ .*%:(%d+)"))
 
 		if cps_line_number then
+			-- Look up the function responsible for this line in the `.cps` file
 			local function_name = find_closest_function(cps_line_number, function_definitions, sorted_line_numbers)
+
 			if function_name then
 				-- Store function call, limiting depth to 3
 				table.insert(function_stack, function_name)
 				if #function_stack > 3 then
-					table.remove(function_stack, 1) -- Remove oldest if exceeding depth 3
+					table.remove(function_stack, 1)
 				end
 			end
 		end
 
-		-- If it's an actual NC command (not debug), attach the call stack
+		-- If it's an actual NC command (not debug), attach the call stack to the correct NC line
 		if not line:match("!DEBUG") and line:match("%u") then
-			-- Convert function stack into a readable hint
 			if #function_stack > 0 then
-				hints[line_number] = table.concat(function_stack, " → ")
+				hints[nc_line_number] = table.concat(function_stack, " → ")
 			end
 		end
 	end
@@ -101,17 +105,24 @@ function M.add_function_hints(cps_file, nc_file)
 		return
 	end
 
+	-- 🛠️ Get the number of lines in the `.nc` buffer
 	local total_lines = vim.api.nvim_buf_line_count(bufnr)
 
-	for line_number, function_name in pairs(hints) do
-		-- 🛠️ Ensure the line number is within valid range
-		if line_number <= total_lines then
-			vim.api.nvim_buf_set_extmark(bufnr, vim.api.nvim_create_namespace("FusionPostHints"), line_number - 1, 0, {
-				virt_text = { { " → " .. function_name, "Comment" } },
-				virt_text_pos = "eol",
-			})
+	for nc_line_number, function_name in pairs(hints) do
+		-- Ensure the line exists in the NC buffer
+		if nc_line_number <= total_lines then
+			vim.api.nvim_buf_set_extmark(
+				bufnr,
+				vim.api.nvim_create_namespace("FusionPostHints"),
+				nc_line_number - 1,
+				0,
+				{
+					virt_text = { { " → " .. function_name, "Comment" } },
+					virt_text_pos = "eol",
+				}
+			)
 		else
-			print(string.format("Skipping invalid hint line: %d (out of range)", line_number))
+			print(string.format("Skipping invalid hint line: %d (out of range)", nc_line_number))
 		end
 	end
 
