@@ -20,6 +20,7 @@ function M.run_post_processor(selected_file, opts)
 
 	local output_file = selected_file:gsub("%.cnc$", ".nc")
 	local log_file = selected_file:gsub("%.cnc$", ".log")
+	local cleaned_output_file = selected_file:gsub("%.cnc$", "-cleaned.nc")
 
 	local cmd = string.format(
 		'"%s" "%s" "%s" --property programName 1001 --debugall',
