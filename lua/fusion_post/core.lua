@@ -18,25 +18,27 @@ function M.run_post_processor(selected_file, opts)
 		return
 	end
 
+	local output_path = "/Users/philbutterworth/fusion-posts/Debug/debug_post.nc"
 	local output_file = selected_file:gsub("%.cnc$", ".nc")
 	local log_file = selected_file:gsub("%.cnc$", ".log")
-	local cleaned_output_file = selected_file:gsub("%.cnc$", "-cleaned.nc")
+	-- local cleaned_output_file = selected_file:gsub("%.cnc$", "-cleaned.nc")
 
 	local cmd = string.format(
-		'"%s" "%s" "%s" --property programName 1001 --debugall',
+		'"%s" "%s" "%s" "%s" --property programName 1001',
 		post_exe_path,
 		post_processor,
-		selected_file
+		selected_file,
+		output_path
 	)
 	print("Running command: " .. cmd)
 
 	local result = vim.fn.system(cmd)
 	local exit_code = vim.v.shell_error
 
-	if vim.fn.filereadable(output_file) == 1 then
-		M.clean_debug_output(output_file, cleaned_output_file)
-		ui.open_preview(cleaned_output_file, "gcode")
-		hint.add_function_hints(post_processor, cleaned_output_file, output_file)
+	if vim.fn.filereadable(output_path) == 1 then
+		-- M.clean_debug_output(output_file, cleaned_output_file)
+		ui.open_preview(output_path, "gcode")
+		-- hint.add_function_hints(post_processor, cleaned_output_file, output_file)
 	elseif (exit_code ~= 0) and vim.fn.filereadable(log_file) then
 		ui.open_preview(log_file, "text")
 		print(string.format("Post failed (exit code %d). Showing log.", exit_code))
@@ -71,4 +73,4 @@ function M.clean_debug_output(input_file, output_file)
 	print("Cleaned NC file created: " .. output_file)
 end
 
-return M
+return
