@@ -29,6 +29,7 @@ end
 
 -- 🛠️ Extract function mappings from `!DEBUG` lines and match with `.cps` functions
 function M.extract_function_hints(nc_file, cps_file)
+	print("Extracting Hints")
 	local hints = {}
 
 	-- Get function mappings from the `.cps` file
@@ -48,6 +49,7 @@ function M.extract_function_hints(nc_file, cps_file)
 
 		-- Detect `!DEBUG` lines and extract the line number from the `.cps` file
 		local post_line = line:match("!DEBUG: %d+ .* ([%w_]+%.cps):(%d+)")
+		print(post_line)
 		if post_line then
 			local cps_line_number = tonumber(post_line)
 			local function_name = function_definitions[cps_line_number]
