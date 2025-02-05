@@ -45,16 +45,55 @@ local function find_closest_function(cps_line_number, function_definitions, sort
 	return closest_function
 end
 
--- 🛠️ Extract function hints and correctly match `.cps` functions to `.nc` file lines
-function M.extract_function_hints(nc_file, cps_file)
+-- 🛠️ Build a mapping from the cleaned file to the debug file
+function M.build_clean_to_debug_mapping(clean_file, debug_file)
+	local clean_to_debug = {}
+	local debug_lines = {}
+
+	-- Read debug file into an indexed table
+	local file = io.open(debug_file, "r")
+	if not file then
+		print("Error: Cannot open debug NC file for mapping.")
+		return {}
+	end
+
+	for line in file:lines() do
+		table.insert(debug_lines, line)
+	end
+	file:close()
+
+	-- Read the cleaned file and map its lines to the closest debug file lines
+	local file = io.open(clean_file, "r")
+	if not file then
+		print("Error: Cannot open cleaned NC file for mapping.")
+		return {}
+	end
+
+	local clean_index = 1
+	for line in file:lines() do
+		-- Find the closest line match in the debug file (without `!DEBUG` lines)
+		while debug_lines[clean_index] and debug_lines[clean_index]:match("!DEBUG") do
+			clean_index = clean_index + 1
+		end
+
+		clean_to_debug[clean_index] = clean_index -- Simple 1-to-1 mapping
+		clean_index = clean_index + 1
+	end
+
+	file:close()
+	return clean_to_debug
+end
+
+-- 🛠️ Extract function hints from `!DEBUG` lines and correctly match to `.nc` file lines
+function M.extract_function_hints(debug_nc_file, cps_file)
 	local hints = {}
 
 	-- Get function mappings from the `.cps` file
 	local function_definitions, sorted_line_numbers = M.extract_function_definitions(cps_file)
 
-	local file = io.open(nc_file, "r")
+	local file = io.open(debug_nc_file, "r")
 	if not file then
-		print("Error: Cannot open NC file for hint extraction.")
+		print("Error: Cannot open debug NC file for hint extraction.")
 		return {}
 	end
 
@@ -92,36 +131,36 @@ function M.extract_function_hints(nc_file, cps_file)
 end
 
 -- 🛠️ Attach function hints as virtual text in Neovim
-function M.add_function_hints(cps_file, nc_file)
+function M.add_function_hints(cps_file, clean_nc_file, debug_nc_file)
 	local bufnr = vim.fn.bufnr("%")
 	if bufnr == -1 then
 		return
 	end
 
-	local hints = M.extract_function_hints(nc_file, cps_file)
+	-- Extract function hints from debug NC file
+	local hints = M.extract_function_hints(debug_nc_file, cps_file)
 	if not hints or vim.tbl_isempty(hints) then
 		print("No function hints found.")
 		return
 	end
 
-	-- 🛠️ Get the number of lines in the `.nc` buffer
+	-- 🛠️ Map cleaned NC file lines to debug NC file lines
+	local clean_to_debug = M.build_clean_to_debug_mapping(clean_nc_file, debug_nc_file)
+
+	-- 🛠️ Get the number of lines in the cleaned `.nc` buffer
 	local total_lines = vim.api.nvim_buf_line_count(bufnr)
 
-	for nc_line_number, function_name in pairs(hints) do
+	for clean_line, debug_line in pairs(clean_to_debug) do
+		local function_name = hints[debug_line]
+
 		-- Ensure the line exists in the NC buffer
-		if nc_line_number <= total_lines then
-			vim.api.nvim_buf_set_extmark(
-				bufnr,
-				vim.api.nvim_create_namespace("FusionPostHints"),
-				nc_line_number - 1,
-				0,
-				{
-					virt_text = { { " → " .. function_name, "Comment" } },
-					virt_text_pos = "eol",
-				}
-			)
+		if function_name and clean_line <= total_lines then
+			vim.api.nvim_buf_set_extmark(bufnr, vim.api.nvim_create_namespace("FusionPostHints"), clean_line - 1, 0, {
+				virt_text = { { " → " .. function_name, "Comment" } },
+				virt_text_pos = "eol",
+			})
 		else
-			print(string.format("Skipping invalid hint line: %d (out of range)", nc_line_number))
+			print(string.format("Skipping invalid hint line: %d (out of range)", clean_line))
 		end
 	end
 
