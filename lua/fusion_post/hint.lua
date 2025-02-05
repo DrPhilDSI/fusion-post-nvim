@@ -45,7 +45,7 @@ local function find_closest_function(cps_line_number, function_definitions, sort
 	return closest_function
 end
 
--- 🛠️ Extract function hints from `!DEBUG` lines and correctly match to `.nc` lines
+-- 🛠️ Extract function hints and correctly match `.cps` functions to `.nc` file lines
 function M.extract_function_hints(nc_file, cps_file)
 	local hints = {}
 
@@ -59,7 +59,8 @@ function M.extract_function_hints(nc_file, cps_file)
 	end
 
 	local function_stack = {} -- Stores up to 3 function calls
-	local nc_line_number = 0 -- Track the current NC file line
+	local nc_line_number = 0 -- Track current `.nc` line
+	local last_function = nil -- Track the last function assigned
 
 	for line in file:lines() do
 		nc_line_number = nc_line_number + 1
@@ -68,19 +69,20 @@ function M.extract_function_hints(nc_file, cps_file)
 		local cps_line_number = tonumber(line:match("!DEBUG: %d+ .*%:(%d+)"))
 
 		if cps_line_number then
-			-- Look up the function responsible for this line in the `.cps` file
+			-- Look up the function responsible for this `.nc` line
 			local function_name = find_closest_function(cps_line_number, function_definitions, sorted_line_numbers)
 
-			if function_name then
-				-- Store function call, limiting depth to 3
+			if function_name and function_name ~= last_function then
+				print(string.format("Function name: %d", function_name))
+				last_function = function_name -- Avoid duplicate hints
 				table.insert(function_stack, function_name)
 				if #function_stack > 3 then
-					table.remove(function_stack, 1)
+					table.remove(function_stack, 1) -- Limit to 3 deep
 				end
 			end
 		end
 
-		-- If it's an actual NC command (not debug), attach the call stack to the correct NC line
+		-- If it's an actual NC command (not debug), attach the call stack to the correct `.nc` line
 		if not line:match("!DEBUG") and line:match("%u") then
 			if #function_stack > 0 then
 				hints[nc_line_number] = table.concat(function_stack, " → ")
