@@ -2,9 +2,37 @@ local M = {}
 
 M.hint_data = {}
 
--- 🛠️ Extract function mappings from `!DEBUG` lines
-function M.extract_function_hints(nc_file)
+-- 🛠️ Extract function names and their line numbers from the `.cps` file
+function M.extract_function_definitions(cps_file)
+	local functions = {}
+
+	local file = io.open(cps_file, "r")
+	if not file then
+		print("Error: Cannot open CPS file for function extraction.")
+		return {}
+	end
+
+	local line_number = 0
+	for line in file:lines() do
+		line_number = line_number + 1
+
+		-- Look for function definitions (e.g., `function writeWCS()`)
+		local function_name = line:match("function%s+([%w_]+)%s*%(")
+		if function_name then
+			functions[tonumber(line_number)] = function_name
+		end
+	end
+
+	file:close()
+	return functions
+end
+
+-- 🛠️ Extract function mappings from `!DEBUG` lines and match with `.cps` functions
+function M.extract_function_hints(nc_file, cps_file)
 	local hints = {}
+
+	-- Get function mappings from the `.cps` file
+	local function_definitions = M.extract_function_definitions(cps_file)
 
 	local file = io.open(nc_file, "r")
 	if not file then
@@ -18,13 +46,18 @@ function M.extract_function_hints(nc_file)
 	for line in file:lines() do
 		line_number = line_number + 1
 
-		-- Detect `!DEBUG` lines and extract the CPS function responsible
-		local cps_function, post_line = line:match("!DEBUG: %d+ .* ([%w_]+%.cps):(%d+)")
-		if cps_function and post_line then
-			-- Store function call, limiting depth to 3
-			table.insert(function_stack, cps_function .. ":" .. post_line)
-			if #function_stack > 3 then
-				table.remove(function_stack, 1) -- Remove oldest if exceeding depth 3
+		-- Detect `!DEBUG` lines and extract the line number from the `.cps` file
+		local post_line = line:match("!DEBUG: %d+ .* ([%w_]+%.cps):(%d+)")
+		if post_line then
+			local cps_line_number = tonumber(post_line)
+			local function_name = function_definitions[cps_line_number]
+
+			if function_name then
+				-- Store function call, limiting depth to 3
+				table.insert(function_stack, function_name)
+				if #function_stack > 3 then
+					table.remove(function_stack, 1) -- Remove oldest if exceeding depth 3
+				end
 			end
 		end
 
@@ -48,7 +81,14 @@ function M.add_function_hints(nc_file)
 		return
 	end
 
-	local hints = M.extract_function_hints(nc_file)
+	-- Get currently open `.cps` file
+	local cps_file = vim.fn.expand("%:p")
+	if not cps_file:match("%.cps$") then
+		print("Error: No valid CPS file is open.")
+		return
+	end
+
+	local hints = M.extract_function_hints(nc_file, cps_file)
 	if not hints or vim.tbl_isempty(hints) then
 		print("No function hints found.")
 		return
