@@ -58,11 +58,11 @@ function M.extract_function_hints(nc_file, cps_file)
 		return {}
 	end
 
-	local function_stack = {} -- Stores up to 3 function calls
 	local nc_line_number = 0 -- Track current `.nc` line
 	local last_function = nil -- Track the last function assigned
 
 	for line in file:lines() do
+		local function_stack = {} -- Stores up to 3 function calls
 		nc_line_number = nc_line_number + 1
 
 		-- Extract only the CPS line number from the `!DEBUG` lines
