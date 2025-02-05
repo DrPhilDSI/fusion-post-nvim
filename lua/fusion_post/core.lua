@@ -36,7 +36,7 @@ function M.run_post_processor(selected_file, opts)
 	if vim.fn.filereadable(output_file) == 1 then
 		M.clean_debug_output(output_file, cleaned_output_file)
 		ui.open_preview(cleaned_output_file, "gcode")
-		hint.add_function_hints(post_processor, output_file)
+		hint.add_function_hints(post_processor, cleaned_output_file, output_file)
 	elseif (exit_code ~= 0) and vim.fn.filereadable(log_file) then
 		ui.open_preview(log_file, "text")
 		print(string.format("Post failed (exit code %d). Showing log.", exit_code))
