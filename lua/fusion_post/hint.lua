@@ -12,21 +12,28 @@ function M.extract_function_hints(nc_file)
 		return {}
 	end
 
-	local current_function = nil
+	local function_stack = {} -- Stores up to 3 function calls
 	local line_number = 0
 
 	for line in file:lines() do
 		line_number = line_number + 1
 
-		-- Look for function call stack markers (Example: `!DEBUG: 3 Connection moves machine sim.cps:1553`)
-		local post_line = line:match("!DEBUG: %d+ .* ([%w_]+%.cps):(%d+)")
-		if post_line then
-			current_function = post_line -- Example: "machine sim.cps:1553"
+		-- Detect `!DEBUG` lines and extract the CPS function responsible
+		local cps_function, post_line = line:match("!DEBUG: %d+ .* ([%w_]+%.cps):(%d+)")
+		if cps_function and post_line then
+			-- Store function call, limiting depth to 3
+			table.insert(function_stack, cps_function .. ":" .. post_line)
+			if #function_stack > 3 then
+				table.remove(function_stack, 1) -- Remove oldest if exceeding depth 3
+			end
 		end
 
-		-- Attach the function hint to this line
-		if current_function then
-			hints[line_number] = current_function
+		-- If it's an actual NC command (not debug), attach the call stack
+		if not line:match("!DEBUG") and line:match("%u") then
+			-- Convert function stack into a readable hint
+			if #function_stack > 0 then
+				hints[line_number] = table.concat(function_stack, " → ")
+			end
 		end
 	end
 
@@ -56,7 +63,7 @@ function M.add_function_hints(nc_file)
 		})
 	end
 
-	print("Function hints added to NC output.")
+	print("Function hints added to NC output (Max Depth: 3).")
 end
 
 return M
