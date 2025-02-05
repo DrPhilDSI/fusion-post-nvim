@@ -73,7 +73,7 @@ function M.extract_function_hints(nc_file, cps_file)
 			local function_name = find_closest_function(cps_line_number, function_definitions, sorted_line_numbers)
 
 			if function_name and function_name ~= last_function then
-				print(string.format("Function name: %d", function_name))
+				print(string.format("Function name: %s", function_name))
 				last_function = function_name -- Avoid duplicate hints
 				table.insert(function_stack, function_name)
 				if #function_stack > 3 then
