@@ -19,7 +19,7 @@ function M.run_post_processor(selected_file, opts)
 	end
 	local temp_dir = os.getenv("TMPDIR")
 	local sub_dir = temp_dir .. "fusion_nvim/"
-	os.execute("mkdir -p" .. sub_dir)
+	os.execute("mkdir" .. sub_dir)
 
 	local output_file = sub_dir .. "debug_post.nc"
 	local log_file = output_file:gsub("%.nc", ".log")
