@@ -106,7 +106,7 @@ function M.add_function_hints(cps_file, clean_nc_file, debug_nc_file)
 
 		-- Ensure the line exists in the NC buffer
 		if function_name then
-			vim.api.nvim_buf_set_extmark(bufnr, vim.api.nvim_create_namespace("FusionPostHints"), line - 1, 0, {
+			vim.api.nvim_buf_set_extmark(bufnr, vim.api.nvim_create_namespace("FusionPostHints"), line_number - 1, 0, {
 				virt_text = { { " → " .. function_name, "Comment" } },
 				virt_text_pos = "eol",
 			})
