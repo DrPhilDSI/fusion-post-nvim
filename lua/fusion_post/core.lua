@@ -19,8 +19,12 @@ function M.run_post_processor(selected_file, opts)
 	end
 	local temp_dir = os.getenv("TMPDIR")
 	local sub_dir = temp_dir .. "fusion_nvim/"
-	os.execute("mkdir" .. sub_dir)
 
+	local success, err = vim.loop.fs_mkdir(sub_dir, 448) -- 448 = 0o700 permission
+
+	if not success and err ~= "EEXIST" then
+		print("Failed to create directory: " .. err)
+	end
 	local output_file = sub_dir .. "debug_post.nc"
 	local log_file = output_file:gsub("%.nc", ".log")
 	local cleaned_output_file = output_file:gsub("%.nc", "-cleaned.nc")
