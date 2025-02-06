@@ -17,16 +17,23 @@ function M.run_post_processor(selected_file, opts)
 		print("Error: No valid post-processor (.cps) file is open.")
 		return
 	end
+	local temp_dir = os.getenv("TMPDIR")
+	local sub_dir = temp_dir .. "fusion_nvim/"
+	os.execute("mkdir -p" .. sub_dir)
 
-	local output_file = selected_file:gsub("%.cnc$", ".nc")
-	local log_file = selected_file:gsub("%.cnc$", ".log")
-	local cleaned_output_file = selected_file:gsub("%.cnc$", "-cleaned.nc")
+	local output_file = sub_dir .. "debug_post.nc"
+	local log_file = output_file:gsub("%.nc", ".log")
+	local cleaned_output_file = output_file:gsub("%.nc", "-cleaned.nc")
+	-- local output_file = selected_file:gsub("%.cnc$", ".nc")
+	-- local log_file = selected_file:gsub("%.cnc$", ".log")
+	-- local cleaned_output_file = selected_file:gsub("%.cnc$", "-cleaned.nc")
 
 	local cmd = string.format(
-		'"%s" "%s" "%s" --property programName 1001 --debugall',
+		'"%s" "%s" "%s" "%s" --property programName 1001 --debugall',
 		post_exe_path,
 		post_processor,
-		selected_file
+		selected_file,
+		output_file
 	)
 	print("Running command: " .. cmd)
 
