@@ -70,6 +70,7 @@ function M.extract_function_hints(debug_nc_file, cps_file)
 		if not line:match("!DEBUG") then
 			nc_line_number = nc_line_number + 1
 			hints[nc_line_number] = table.concat(function_stack, " → ")
+			print(hints[nc_line_number])
 			function_stack = {}
 		end
 	end
@@ -97,8 +98,11 @@ function M.add_function_hints(cps_file, clean_nc_file, debug_nc_file)
 		return {}
 	end
 
+	local line_number = 0
+
 	for line in nc_file:lines() do
-		local function_name = hints[line]
+		line_number = line_number + 1
+		local function_name = hints[line_number]
 
 		-- Ensure the line exists in the NC buffer
 		if function_name then
