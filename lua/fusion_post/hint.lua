@@ -6,6 +6,17 @@ function M.extract_function_definitions(cps_file)
 	local functions = {}
 	local sorted_line_numbers = {}
 
+	local skip_functions = {
+		writeBlock = true,
+		writeLn = true,
+		writeComment = true,
+		onLinear = true,
+		onLinear5D = true,
+		onRapid = true,
+		onRapid5D = true,
+		onCircular = true,
+	}
+
 	local file = io.open(cps_file, "r")
 	if not file then
 		print("Error: Cannot open CPS file for function extraction.")
@@ -18,7 +29,7 @@ function M.extract_function_definitions(cps_file)
 
 		-- Look for function definitions (e.g., `function writeWCS()`)
 		local function_name = line:match("function%s+([%w_]+)%s*%(")
-		if function_name then
+		if function_name and not skip_functions[function_name] then
 			functions[line_number] = function_name
 			table.insert(sorted_line_numbers, line_number)
 		end
@@ -63,7 +74,8 @@ function M.extract_function_hints(debug_nc_file, cps_file)
 			local function_name = find_closest_function(cps_line_number, function_definitions, sorted_line_numbers)
 
 			if function_name then
-				table.insert(function_stack, function_name)
+				local function_line = string.format("%s ln:%d", function_name, cps_line_number)
+				table.insert(function_stack, function_line)
 			end
 		end
 
