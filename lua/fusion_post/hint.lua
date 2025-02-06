@@ -107,7 +107,7 @@ function M.add_function_hints(cps_file, clean_nc_file, debug_nc_file)
 				virt_text_pos = "eol",
 			})
 		else
-			print(string.format("Skipping invalid hint line: %d", line))
+			print(string.format("Skipping invalid hint line: %s", line))
 		end
 	end
 
