@@ -1,7 +1,7 @@
 local M = {}
 
 function M.select_boiler_plate(template_folder, callback)
-	local files = vim.fn.glob(template_folder .. "*.cnc", false, true)
+	local files = vim.fn.glob(template_folder .. "*.js", false, true)
 
 	if #files == 0 then
 		print("No Boiler plate files found in " .. template_folder)
