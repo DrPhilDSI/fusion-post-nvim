@@ -5,14 +5,16 @@ local function get_plugin_root()
 	return str:match("(.*/)")
 end
 
--- Resolve the path to the Fusion 360 `globals.d.ts`
 local plugin_root = get_plugin_root()
 local globals_path = plugin_root .. "lsp/globals.d.ts"
--- Default settings
+
 M.options = {
 	post_exe_path = "", -- User should define in LazyVim setup
 	cnc_folder = "~/Fusion 360/NC Programs/", -- Default CNC folder
 	password = "", -- Password for encrypting
+	boiler_plate_folder = "",
+	shorten_output = true,
+	line_limit = 20,
 }
 
 -- Function to update options with user-provided settings
@@ -34,6 +36,14 @@ function M.setup(opts)
 		local ui = require("fusion_post.ui")
 		ui.select_cnc_file(M.options.cnc_folder, function(selected_file)
 			core.run_post_processor(selected_file, M.options)
+		end)
+	end, {})
+
+	vim.api.nvim_create_user_command("FusionInsert", function()
+		local insert_boiler = require("fusion_post.insert_boiler")
+		local ui = require("fusion_post.ui")
+		ui.select_boiler_plate(M.options.boiler_plate_folder, function(selected_file)
+			insert_boiler.insert_boiler_plate(selected_file)
 		end)
 	end, {})
 
