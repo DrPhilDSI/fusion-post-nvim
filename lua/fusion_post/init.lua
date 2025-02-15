@@ -41,8 +41,8 @@ function M.setup(opts)
 
 	vim.api.nvim_create_autocmd("BufWritePost", {
 		pattern = "*.cps",
-		callback = function()
-			local current_file = vim.fn.expand("%") -- Get the active file
+		callback = function(args)
+			local current_file = args.file
 			if current_file and current_file ~= "" then
 				local core = require("fusion_post.core")
 				core.run_post_processor("saved", M.options) -- Run only for the active file
