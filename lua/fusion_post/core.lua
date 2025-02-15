@@ -9,9 +9,11 @@ function M.run_post_processor(selected_file, opts)
 
 	if selected_file == "saved" then
 		if last_selected == "" then
+			print("Error: No previous output")
 			return
 		else
 			selected_file = last_selected
+			print("%s re-called", selected_file)
 		end
 	end
 
