@@ -21,7 +21,6 @@ M.options = {
 function M.setup(opts)
 	M.options = vim.tbl_extend("force", M.options, opts or {})
 
-	local core = require("fusion_post.core")
 	-- Validate paths
 	if vim.fn.filereadable(M.options.post_exe_path) ~= 1 then
 		print("Warning: post.exe path is invalid. Set `post_exe_path` in your LazyVim config.")
@@ -43,7 +42,11 @@ function M.setup(opts)
 	vim.api.nvim_create_autocmd("BufWritePost", {
 		pattern = "*.cps",
 		callback = function()
-			core.run_post_processor("saved", M.options)
+			local current_file = vim.fn.expand("%") -- Get the active file
+			if current_file and current_file ~= "" then
+				local core = require("fusion_post.core")
+				core.run_post_processor(current_file, M.options) -- Run only for the active file
+			end
 		end,
 	})
 
