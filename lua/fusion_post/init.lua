@@ -76,43 +76,6 @@ function M.setup(opts)
 		local decrypt = require("fusion_post.encrypt")
 		decrypt.decrypt_post(M.options)
 	end, {})
-
-	-- Register TypeScript LSP (ts_ls) for Fusion 360 Post Processors
-	local lspconfig = require("lspconfig")
-
-	lspconfig.ts_ls.setup({
-		root_dir = function(fname)
-			return require("lspconfig.util").find_git_ancestor(fname) or vim.fn.getcwd() -- Ensures LSP loads in the correct workspace
-		end,
-		settings = {
-			javascript = {
-				suggest = {
-					completeFunctionCalls = true,
-				},
-				implicitProjectConfig = {
-					checkJs = true,
-				},
-			},
-		},
-		init_options = {
-			preferences = {
-				includeCompletionsForImportStatements = true,
-			},
-		},
-	})
-
-	-- Auto-load globals.d.ts for Fusion 360
-	vim.api.nvim_create_autocmd("BufRead", {
-		pattern = "*.cps",
-		callback = function()
-			local ts_settings = vim.lsp.get_active_clients({ name = "ts_ls" })[1]
-			if ts_settings then
-				ts_settings.config.settings.typescript = ts_settings.config.settings.typescript or {}
-				ts_settings.config.settings.typescript.types = { globals_path }
-				vim.lsp.buf_notify(0, "workspace/didChangeConfiguration", { settings = ts_settings.config.settings })
-			end
-		end,
-	})
 end
 
 return M
