@@ -41,15 +41,13 @@ function M.setup(opts)
 
 	vim.api.nvim_create_autocmd("BufWritePost", {
 		pattern = "*.cps",
-		callback = function(args)
-			local current_file = args.file
-			vim.defer_fn(function()
-				-- Check if the file still exists and is the same
-				if vim.api.nvim_buf_get_name(0) == current_file then
-					local core = require("fusion_post.core")
-					core.run_post_processor("saved", M.options)
-				end
-			end, 100) -- 100ms delay
+		callback = function()
+			local post_processor = vim.fn.expand("%:p")
+			if not post_processor:match("%.cps$") then
+				return
+			end
+			local core = require("fusion_post.core")
+			core.run_post_processor("saved", M.options)
 		end,
 	})
 
