@@ -43,10 +43,13 @@ function M.setup(opts)
 		pattern = "*.cps",
 		callback = function(args)
 			local current_file = args.file
-			if current_file and current_file ~= "" then
-				local core = require("fusion_post.core")
-				core.run_post_processor("saved", M.options) -- Run only for the active file
-			end
+			vim.defer_fn(function()
+				-- Check if the file still exists and is the same
+				if vim.api.nvim_buf_get_name(0) == current_file then
+					local core = require("fusion_post.core")
+					core.run_post_processor("saved", M.options)
+				end
+			end, 100) -- 100ms delay
 		end,
 	})
 
