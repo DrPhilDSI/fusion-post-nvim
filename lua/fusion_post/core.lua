@@ -2,10 +2,20 @@ local M = {}
 
 local ui = require("fusion_post.ui")
 local hint = require("fusion_post.hint")
+local last_selected = ""
 
 function M.run_post_processor(selected_file, opts)
 	local post_exe_path = opts.post_exe_path
-	local cnc_folder = vim.fn.expand(opts.cnc_folder)
+
+	if selected_file == "saved" then
+		if last_selected == "" then
+			return
+		else
+			selected_file = last_selected
+		end
+	end
+
+	last_selected = selected_file
 
 	if vim.fn.filereadable(post_exe_path) ~= 1 then
 		print("Error: post.exe path is invalid. Set it in your LazyVim config.")
