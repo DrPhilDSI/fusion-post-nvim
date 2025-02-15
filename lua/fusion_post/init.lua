@@ -45,7 +45,7 @@ function M.setup(opts)
 			local current_file = vim.fn.expand("%") -- Get the active file
 			if current_file and current_file ~= "" then
 				local core = require("fusion_post.core")
-				core.run_post_processor(current_file, M.options) -- Run only for the active file
+				core.run_post_processor("saved", M.options) -- Run only for the active file
 			end
 		end,
 	})
