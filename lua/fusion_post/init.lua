@@ -6,7 +6,7 @@ local function get_plugin_root()
 end
 
 local plugin_root = get_plugin_root()
-local globals_path = plugin_root .. "lsp/globals.d.ts"
+local globals_path = plugin_root .. "types/globals.d.ts"
 
 M.options = {
 	post_exe_path = "", -- User should define in LazyVim setup
@@ -34,27 +34,32 @@ function M.setup(opts)
 	vim.api.nvim_create_user_command("FusionPost", function()
 		local core = require("fusion_post.core")
 		local ui = require("fusion_post.ui")
-		ui.select_cnc_file(M.options.cnc_folder, function(selected_file)
+		ui.select_file(M.options.cnc_folder, function(selected_file)
 			core.run_post_processor(selected_file, M.options)
 		end)
 	end, {})
 
 	vim.api.nvim_create_autocmd("BufWritePost", {
 		pattern = "*.cps",
-		callback = function()
+		callback = function(args)
 			local post_processor = vim.fn.expand("%:p")
 			if not post_processor:match("%.cps$") then
 				return
 			end
-			local core = require("fusion_post.core")
-			core.run_post_processor("saved", M.options)
+			local current_file = args.file
+			if vim.api.nvim_buf_get_name(0) == current_file then
+				vim.defer_fn(function()
+					local core = require("fusion_post.core")
+					core.run_post_processor("saved", M.options)
+				end, 100)
+			end
 		end,
 	})
 
 	vim.api.nvim_create_user_command("FusionInsert", function()
 		local insert_boiler = require("fusion_post.insert_boiler")
 		local ui = require("fusion_post.ui")
-		ui.select_boiler_plate(M.options.boiler_plate_folder, function(selected_file)
+		ui.select_file(M.options.boiler_plate_folder, function(selected_file)
 			insert_boiler.insert_boiler_plate(selected_file)
 		end)
 	end, {})
@@ -75,6 +80,19 @@ function M.setup(opts)
 	vim.api.nvim_create_user_command("FusionDecrypt", function()
 		local decrypt = require("fusion_post.encrypt")
 		decrypt.decrypt_post(M.options)
+	end, {})
+
+	vim.api.nvim_create_user_command("FusionAutoComplete", function()
+		local line = '/// <reference path="' .. globals_path .. '" />'
+
+		local first_line = vim.fn.getline(1)
+		if first_line:find("globals%.d%.ts") then
+			print("Reference already exists.")
+			return
+		end
+
+		vim.api.nvim_buf_set_lines(0, 0, 0, false, { line, "" })
+		print("Fusion 360 globals reference added.")
 	end, {})
 end
 

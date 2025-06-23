@@ -2,22 +2,22 @@ local M = {}
 
 local ui = require("fusion_post.ui")
 local hint = require("fusion_post.hint")
-local last_selected = ""
+local previous_cnc_file = ""
 
 function M.run_post_processor(selected_file, opts)
 	local post_exe_path = opts.post_exe_path
 
 	if selected_file == "saved" then
-		if last_selected == "" then
+		if previous_cnc_file == "" then
 			print("Error: No previous output")
 			return
 		else
-			selected_file = last_selected
+			selected_file = previous_cnc_file
 			print("%s re-called", selected_file)
 		end
 	end
 
-	last_selected = selected_file
+	previous_cnc_file = selected_file
 
 	if vim.fn.filereadable(post_exe_path) ~= 1 then
 		print("Error: post.exe path is invalid. Set it in your LazyVim config.")
@@ -48,21 +48,37 @@ function M.run_post_processor(selected_file, opts)
 		selected_file,
 		output_file
 	)
-	print("Running command: " .. cmd)
+	-- print("Running command: " .. cmd)
 
-	local result = vim.fn.system(cmd)
-	local exit_code = vim.v.shell_error
+	local cmd_args = {
+		post_exe_path,
+		post_processor,
+		selected_file,
+		output_file,
+		"--property",
+		"programName",
+		"1001",
+		"--debugall",
+	}
 
-	if vim.fn.filereadable(output_file) == 1 then
-		M.clean_debug_output(output_file, cleaned_output_file)
-		ui.open_preview(cleaned_output_file, "gcode")
-		hint.add_function_hints(post_processor, cleaned_output_file, output_file)
-	elseif (exit_code ~= 0) and vim.fn.filereadable(log_file) then
-		ui.open_preview(log_file, "text")
-		print(string.format("Post failed (exit code %d). Showing log.", exit_code))
-	else
-		print(string.format("Error: Post processing failed (exit code %d).", exit_code))
-	end
+	-- vim.notify("Running post processor...", vim.log.levels.INFO)
+
+	vim.system(cmd_args, { text = true }, function(res)
+		if res.code == 0 and vim.fn.filereadable(output_file) == 1 then
+			M.clean_debug_output(output_file, cleaned_output_file)
+			vim.schedule(function()
+				ui.open_preview(cleaned_output_file, "gcode")
+				hint.add_function_hints(post_processor, cleaned_output_file, output_file)
+			end)
+		elseif vim.fn.filereadable(log_file) == 1 then
+			vim.schedule(function()
+				ui.open_preview(log_file, "text")
+			end)
+			vim.notify("Post failed (exit code " .. res.code .. "). Showing log.", vim.log.levels.WARN)
+		else
+			vim.notify("Post failed (exit code " .. res.code .. ")", vim.log.levels.ERROR)
+		end
+	end)
 end
 
 function M.clean_debug_output(input_file, output_file)

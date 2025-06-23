@@ -1,63 +1,36 @@
 local M = {}
 
-function M.select_boiler_plate(template_folder, callback)
-	local files = vim.fn.glob(template_folder .. "*", false, true)
+function M.select_file(folder, callback)
+	local exts = { "js", "cnc" }
+	local all_files = {}
 
-	if #files == 0 then
-		print("No Boiler plate files found in " .. template_folder)
+	for _, ext in ipairs(exts) do
+		local pattern = folder .. "*." .. ext
+		local files = vim.fn.glob(pattern, false, true)
+		vim.list_extend(all_files, files)
+	end
+
+	if #all_files == 0 then
+		print("No files found in " .. folder)
 		return nil
 	end
 
-	print("UI File Selection Started...") -- Debugging
+	-- Create display list and map
+	local items = {}
+	local lookup = {}
 
-	local filenames = {} -- Store short names
-	local file_map = {} -- Map short names to full paths
-
-	for _, file in ipairs(files) do
-		local short_name = vim.fn.fnamemodify(file, ":t") -- Extract only the filename
-		table.insert(filenames, short_name)
-		file_map[short_name] = file -- Store full path for lookup
+	for _, full_path in ipairs(all_files) do
+		local name = vim.fn.fnamemodify(full_path, ":t") -- just the file name
+		table.insert(items, name)
+		lookup[name] = full_path
 	end
 
-	vim.ui.select(filenames, { prompt = "Select Boiler pLate File" }, function(choice)
+	vim.ui.select(items, { prompt = "Select File" }, function(choice)
 		if choice then
-			local full_path = file_map[choice] -- Retrieve full path
-			print("User selected: " .. full_path) -- Debugging
+			local full_path = lookup[choice]
+			print("User selected: " .. full_path)
 			if type(callback) == "function" then
-				callback(full_path) -- Pass full path to the callback
-			else
-				print("Error: No valid callback function provided!") -- Debugging
-			end
-		else
-			print("User cancelled file selection") -- Debugging
-		end
-	end)
-end
-
-function M.select_cnc_file(cnc_folder, callback)
-	local files = vim.fn.glob(cnc_folder .. "*.cnc", false, true)
-
-	if #files == 0 then
-		print("No .cnc files found in " .. cnc_folder)
-		return nil
-	end
-
-	print("UI File Selection Started...") -- Debugging
-	local filenames = {} -- Store short names
-	local file_map = {} -- Map short names to full paths
-
-	for _, file in ipairs(files) do
-		local short_name = vim.fn.fnamemodify(file, ":t") -- Extract only the filename
-		table.insert(filenames, short_name)
-		file_map[short_name] = file -- Store full path for lookup
-	end
-
-	vim.ui.select(filenames, { prompt = "Select CNC File" }, function(choice)
-		if choice then
-			local full_path = file_map[choice] -- Retrieve full path
-			print("User selected: " .. full_path) -- Debugging
-			if type(callback) == "function" then
-				callback(full_path) -- Pass full path to the callback
+				callback(full_path)
 			else
 				print("Error: No valid callback function provided!") -- Debugging
 			end
