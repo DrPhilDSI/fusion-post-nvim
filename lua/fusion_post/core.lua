@@ -4,7 +4,15 @@ local ui = require("fusion_post.ui")
 local hint = require("fusion_post.hint")
 local previous_cnc_file = ""
 
-function M.run_post_processor(selected_file, opts)
+local function get_plugin_root()
+	local str = debug.getinfo(1, "S").source:sub(2)
+	return str:match("(.*/)")
+end
+
+local plugin_root = get_plugin_root()
+local dumper_path = plugin_root .. "dump/dump.cps"
+
+function M.run_post_processor(selected_file, opts, useDumper)
 	local post_exe_path = opts.post_exe_path
 
 	if selected_file == "saved" then
@@ -25,10 +33,15 @@ function M.run_post_processor(selected_file, opts)
 	end
 
 	local post_processor = vim.fn.expand("%:p")
+	if useDumper then
+		post_processor = dumper_path
+	end
+
 	if not post_processor:match("%.cps$") then
 		print("Error: No valid post-processor (.cps) file is open.")
 		return
 	end
+
 	local temp_dir = os.getenv("TMPDIR")
 	local sub_dir = temp_dir .. "fusion_nvim/"
 
@@ -68,7 +81,9 @@ function M.run_post_processor(selected_file, opts)
 			M.clean_debug_output(output_file, cleaned_output_file)
 			vim.schedule(function()
 				ui.open_preview(cleaned_output_file, "gcode")
-				hint.add_function_hints(post_processor, cleaned_output_file, output_file)
+				if not useDumper then
+					hint.add_function_hints(post_processor, cleaned_output_file, output_file)
+				end
 			end)
 		elseif vim.fn.filereadable(log_file) == 1 then
 			vim.schedule(function()

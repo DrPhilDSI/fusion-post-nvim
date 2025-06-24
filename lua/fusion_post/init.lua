@@ -1,12 +1,4 @@
 local M = {}
--- Function to get the plugin directory dynamically
-local function get_plugin_root()
-	local str = debug.getinfo(1, "S").source:sub(2)
-	return str:match("(.*/)")
-end
-
-local plugin_root = get_plugin_root()
-local globals_path = plugin_root .. "types/globals.d.ts"
 
 M.options = {
 	post_exe_path = "", -- User should define in LazyVim setup
@@ -16,6 +8,15 @@ M.options = {
 	shorten_output = true,
 	line_limit = 20,
 }
+
+-- Function to get the plugin directory dynamically
+local function get_plugin_root()
+	local str = debug.getinfo(1, "S").source:sub(2)
+	return str:match("(.*/)")
+end
+
+local plugin_root = get_plugin_root()
+local globals_path = plugin_root .. "types/globals.d.ts"
 
 -- Function to update options with user-provided settings
 function M.setup(opts)
@@ -35,7 +36,15 @@ function M.setup(opts)
 		local core = require("fusion_post.core")
 		local ui = require("fusion_post.ui")
 		ui.select_file(M.options.cnc_folder, function(selected_file)
-			core.run_post_processor(selected_file, M.options)
+			core.run_post_processor(selected_file, M.options, false)
+		end)
+	end, {})
+
+	vim.api.nvim_create_user_command("FusionDump", function()
+		local core = require("fusion_post.core")
+		local ui = require("fusion_post.ui")
+		ui.select_file(M.options.cnc_folder, function(selected_file)
+			core.run_post_processor(selected_file, M.options, true)
 		end)
 	end, {})
 
@@ -50,7 +59,7 @@ function M.setup(opts)
 			if vim.api.nvim_buf_get_name(0) == current_file then
 				vim.defer_fn(function()
 					local core = require("fusion_post.core")
-					core.run_post_processor("saved", M.options)
+					core.run_post_processor("saved", M.options, false)
 				end, 100)
 			end
 		end,
@@ -72,6 +81,7 @@ function M.setup(opts)
 			print("Current post.exe path: " .. M.options.post_exe_path)
 		end
 	end, { nargs = "?" })
+
 	vim.api.nvim_create_user_command("FusionEncrypt", function()
 		local encrypt = require("fusion_post.encrypt")
 		encrypt.encrypt_post(M.options)
