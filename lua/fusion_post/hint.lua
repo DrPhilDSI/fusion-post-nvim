@@ -89,8 +89,11 @@ function M.extract_function_hints(debug_nc_file, cps_file)
 	return hints
 end
 
-function M.add_function_hints(cps_file, clean_nc_file, debug_nc_file)
-	local bufnr = vim.fn.bufnr("%")
+function M.add_function_hints(cps_file, clean_nc_file, debug_nc_file, bufnr)
+	-- Use provided bufnr, or fall back to current buffer
+	if not bufnr then
+		bufnr = vim.fn.bufnr("%")
+	end
 	if bufnr == -1 then
 		return
 	end

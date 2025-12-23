@@ -55,10 +55,12 @@ function M.open_preview(file, filetype)
 
 	vim.cmd("vsplit " .. file)
 	vim.cmd("wincmd L")
+	local bufnr = vim.api.nvim_get_current_buf()
 	vim.bo.buftype = "nofile"
 	vim.bo.swapfile = false
 	vim.bo.bufhidden = "wipe"
 	vim.bo.readonly = true
+	return bufnr
 end
 
 return M

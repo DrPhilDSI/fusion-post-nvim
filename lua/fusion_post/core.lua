@@ -50,20 +50,15 @@ function M.run_post_processor(selected_file, opts, useDumper)
 		print("Failed to create directory: " .. err)
 	end
 
-	local output_file = sub_dir .. "debug_post.nc"
+	-- Two output files: one clean (for preview), one debug (for hints)
+	local output_file = sub_dir .. "post.nc"
+	local debug_output_file = sub_dir .. "post-debug.nc"
 	local log_file = output_file:gsub("%.nc", ".log")
-	local cleaned_output_file = output_file:gsub("%.nc", "-cleaned.nc")
 
-	local cmd = string.format(
-		'"%s" "%s" "%s" "%s" --property programName 1001 --debugall',
-		post_exe_path,
-		post_processor,
-		selected_file,
-		output_file
-	)
-	-- print("Running command: " .. cmd)
+	-- vim.notify("Running post processor...", vim.log.levels.INFO)
 
-	local cmd_args = {
+	-- First pass: Run WITHOUT --debugall to get clean output
+	local cmd_args_clean = {
 		post_exe_path,
 		post_processor,
 		selected_file,
@@ -71,18 +66,38 @@ function M.run_post_processor(selected_file, opts, useDumper)
 		"--property",
 		"programName",
 		"1001",
-		"--debugall",
 	}
 
-	-- vim.notify("Running post processor...", vim.log.levels.INFO)
-
-	vim.system(cmd_args, { text = true }, function(res)
+	vim.system(cmd_args_clean, { text = true }, function(res)
 		if res.code == 0 and vim.fn.filereadable(output_file) == 1 then
-			M.clean_debug_output(output_file, cleaned_output_file)
+			-- Open preview immediately with clean output
 			vim.schedule(function()
-				ui.open_preview(cleaned_output_file, "gcode")
+				local preview_bufnr = ui.open_preview(output_file, "gcode")
+
+				-- If not using dumper, run second pass with debug for hints
 				if not useDumper then
-					hint.add_function_hints(post_processor, cleaned_output_file, output_file)
+					-- Second pass: Run WITH --debugall to get debug output for hints
+					local cmd_args_debug = {
+						post_exe_path,
+						post_processor,
+						selected_file,
+						debug_output_file,
+						"--property",
+						"programName",
+						"1001",
+						"--debugall",
+					}
+
+					vim.system(cmd_args_debug, { text = true }, function(debug_res)
+						if debug_res.code == 0 and vim.fn.filereadable(debug_output_file) == 1 then
+							-- Apply hints to the preview buffer
+							vim.schedule(function()
+								hint.add_function_hints(post_processor, output_file, debug_output_file, preview_bufnr)
+							end)
+						else
+							vim.notify("Debug post run failed (exit code " .. debug_res.code .. "). Hints unavailable.", vim.log.levels.WARN)
+						end
+					end)
 				end
 			end)
 		elseif vim.fn.filereadable(log_file) == 1 then
