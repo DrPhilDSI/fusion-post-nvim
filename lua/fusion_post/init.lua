@@ -5,7 +5,7 @@ M.options = {
 	cnc_folder = "~/Fusion 360/NC Programs/", -- Default CNC folder
 	password = "", -- Password for encrypting
 	boiler_plate_folder = "",
-	shorten_output = true,
+	shorten_output = false,
 	line_limit = 20,
 }
 
@@ -82,6 +82,10 @@ function M.setup(opts)
 		end
 	end, { nargs = "?" })
 
+	vim.api.nvim_create_user_command("FusionDeploy", function()
+		local deploy = require("fusion_post.deploy")
+		deploy.deploy_post(M.options)
+	end, {})
 	vim.api.nvim_create_user_command("FusionEncrypt", function()
 		local encrypt = require("fusion_post.encrypt")
 		encrypt.encrypt_post(M.options)
@@ -104,6 +108,29 @@ function M.setup(opts)
 		vim.api.nvim_buf_set_lines(0, 0, 0, false, { line, "" })
 		print("Fusion 360 globals reference added.")
 	end, {})
+
+	vim.api.nvim_create_user_command("FusionProperties", function()
+		local current_file = vim.fn.expand("%:p")
+		if not current_file:match("%.cps$") then
+			vim.notify("Error: No valid post-processor (.cps) file is open.", vim.log.levels.ERROR)
+			return
+		end
+
+		local properties_ui = require("fusion_post.properties_ui")
+		properties_ui.open_properties_ui(current_file)
+	end, {})
+
+	-- Clear property storage when .cps buffer is closed
+	vim.api.nvim_create_autocmd("BufUnload", {
+		pattern = "*.cps",
+		callback = function(args)
+			local properties = require("fusion_post.properties")
+			local file_path = args.file
+			if file_path and file_path ~= "" then
+				properties.clear_storage(file_path)
+			end
+		end,
+	})
 end
 
 return M

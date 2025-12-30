@@ -1,5 +1,7 @@
 local M = {}
 
+local log = require("fusion_post.log")
+
 function M.select_file(folder, callback)
 	local exts = { "js", "cnc" }
 	local all_files = {}
@@ -28,14 +30,14 @@ function M.select_file(folder, callback)
 	vim.ui.select(items, { prompt = "Select File" }, function(choice)
 		if choice then
 			local full_path = lookup[choice]
-			print("User selected: " .. full_path)
+			log.log("User selected: " .. full_path)
 			if type(callback) == "function" then
 				callback(full_path)
 			else
 				print("Error: No valid callback function provided!") -- Debugging
 			end
 		else
-			print("User cancelled file selection") -- Debugging
+			log.log("User cancelled file selection") -- Debugging
 		end
 	end)
 end

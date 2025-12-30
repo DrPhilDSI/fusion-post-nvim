@@ -2,6 +2,8 @@ local M = {}
 
 local ui = require("fusion_post.ui")
 local hint = require("fusion_post.hint")
+local log = require("fusion_post.log")
+local properties = require("fusion_post.properties")
 local previous_cnc_file = ""
 
 local function get_plugin_root()
@@ -17,11 +19,11 @@ function M.run_post_processor(selected_file, opts, useDumper)
 
 	if selected_file == "saved" then
 		if previous_cnc_file == "" then
-			print("Error: No previous output")
+			log.log("Error: No previous output")
 			return
 		else
 			selected_file = previous_cnc_file
-			print("%s re-called", selected_file)
+			log.log(string.format("%s re-called", selected_file))
 		end
 	end
 
@@ -45,20 +47,16 @@ function M.run_post_processor(selected_file, opts, useDumper)
 	local temp_dir = os.getenv("TMPDIR")
 	local sub_dir = temp_dir .. "fusion_nvim/"
 
-	local success, err = vim.loop.fs_mkdir(sub_dir, 448) -- 448 = 0o700 permission
-	if not success and err ~= "EEXIST" then
+	local ok, err, err_name = vim.loop.fs_mkdir(sub_dir, 448) -- 448 = 0o700 permission
+	if not ok and err_name ~= "EEXIST" then
 		print("Failed to create directory: " .. err)
 	end
 
-	-- Two output files: one clean (for preview), one debug (for hints)
 	local output_file = sub_dir .. "post.nc"
 	local debug_output_file = sub_dir .. "post-debug.nc"
 	local log_file = output_file:gsub("%.nc", ".log")
 
-	-- vim.notify("Running post processor...", vim.log.levels.INFO)
-
-	-- First pass: Run WITHOUT --debugall to get clean output
-	local cmd_args_clean = {
+	local post_options = {
 		post_exe_path,
 		post_processor,
 		selected_file,
@@ -67,8 +65,25 @@ function M.run_post_processor(selected_file, opts, useDumper)
 		"programName",
 		"1001",
 	}
+	if opts.shorten_output then
+		table.insert(post_options, "--shorten")
+		table.insert(post_options, opts.line_limit)
+	end
 
-	vim.system(cmd_args_clean, { text = true }, function(res)
+	-- Get modified properties for this post processor
+	local modified_props = properties.get_modified_properties(post_processor)
+
+	for name, value in pairs(modified_props) do
+		table.insert(post_options, "--property")
+		table.insert(post_options, name)
+		local value_str = tostring(value)
+		if type(value) == "string" then
+			value_str = "'" .. value_str .. "'"
+		end
+		table.insert(post_options, value_str)
+	end
+
+	vim.system(post_options, { text = true }, function(res)
 		if res.code == 0 and vim.fn.filereadable(output_file) == 1 then
 			-- Open preview immediately with clean output
 			vim.schedule(function()
@@ -76,26 +91,22 @@ function M.run_post_processor(selected_file, opts, useDumper)
 
 				-- If not using dumper, run second pass with debug for hints
 				if not useDumper then
-					-- Second pass: Run WITH --debugall to get debug output for hints
-					local cmd_args_debug = {
-						post_exe_path,
-						post_processor,
-						selected_file,
-						debug_output_file,
-						"--property",
-						"programName",
-						"1001",
-						"--debugall",
-					}
+					-- Add debug flag
+					table.insert(post_options, "--debugall")
 
-					vim.system(cmd_args_debug, { text = true }, function(debug_res)
+					vim.system(post_options, { text = true }, function(debug_res)
 						if debug_res.code == 0 and vim.fn.filereadable(debug_output_file) == 1 then
 							-- Apply hints to the preview buffer
 							vim.schedule(function()
 								hint.add_function_hints(post_processor, output_file, debug_output_file, preview_bufnr)
 							end)
 						else
-							vim.notify("Debug post run failed (exit code " .. debug_res.code .. "). Hints unavailable.", vim.log.levels.WARN)
+							log.log(
+								string.format(
+									"Debug post run failed (exit code " .. debug_res.code .. "). Hints unavailable.",
+									vim.log.levels.WARN
+								)
+							)
 						end
 					end)
 				end
@@ -104,9 +115,9 @@ function M.run_post_processor(selected_file, opts, useDumper)
 			vim.schedule(function()
 				ui.open_preview(log_file, "text")
 			end)
-			vim.notify("Post failed (exit code " .. res.code .. "). Showing log.", vim.log.levels.WARN)
+			log.log(string.format("Post failed (exit code " .. res.code .. "). Showing log.", vim.log.levels.WARN))
 		else
-			vim.notify("Post failed (exit code " .. res.code .. ")", vim.log.levels.ERROR)
+			log.log(string.format("Post failed (exit code " .. res.code .. ")", vim.log.levels.ERROR))
 		end
 	end)
 end
@@ -134,7 +145,7 @@ function M.clean_debug_output(input_file, output_file)
 	infile:close()
 	outfile:close()
 
-	print("Cleaned NC file created: " .. output_file)
+	log.log("Cleaned NC file created: " .. output_file)
 end
 
 return M

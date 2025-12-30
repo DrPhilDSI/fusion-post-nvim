@@ -1,5 +1,7 @@
 local M = {}
 
+local log = require("fusion_post.log")
+
 M.hint_data = {}
 
 function M.extract_function_definitions(cps_file)
@@ -80,7 +82,7 @@ function M.extract_function_hints(debug_nc_file, cps_file)
 		if not line:match("!DEBUG") then
 			nc_line_number = nc_line_number + 1
 			hints[nc_line_number] = function_stack[1] -- table.concat(function_stack, " → ")
-			print(hints[nc_line_number])
+			-- print(hints[nc_line_number])
 			function_stack = {}
 		end
 	end
@@ -101,13 +103,13 @@ function M.add_function_hints(cps_file, clean_nc_file, debug_nc_file, bufnr)
 	-- Extract function hints from debug NC file
 	local hints = M.extract_function_hints(debug_nc_file, cps_file)
 	if not hints or vim.tbl_isempty(hints) then
-		print("No function hints found.")
+		log.log("No function hints found.")
 		return
 	end
 
 	local nc_file = io.open(clean_nc_file, "r")
 	if not nc_file then
-		print("Error: Cannot open NC file.")
+		log.log("Error: Cannot open NC file.")
 		return {}
 	end
 
@@ -124,11 +126,9 @@ function M.add_function_hints(cps_file, clean_nc_file, debug_nc_file, bufnr)
 				virt_text_pos = "eol",
 			})
 		else
-			print(string.format("Skipping invalid hint line: %s", line))
+			log.log(string.format("Skipping invalid hint line: %s", line))
 		end
 	end
-
-	print("Function hints added to NC output.")
 end
 
 return M
