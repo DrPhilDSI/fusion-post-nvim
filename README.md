@@ -87,6 +87,10 @@ Check or update your `post.exe` path. Run without arguments to see current path,
 
 View the plugin's activity log. Useful for debugging.
 
+### `:FusionSettings`
+
+Change plugin settings like `Program name` `shorten_output` and `line_limit` on the fly.
+
 ## Usage
 
 Open a `.cps` file, run `:FusionPost` to pick a test file, then just edit and save. The post-processor runs automatically on each save. Use `:FusionProperties` to tweak properties, `:FusionDeploy` to create versioned copies, and `:FusionEncrypt` if you need to protect your code.
