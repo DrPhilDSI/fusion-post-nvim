@@ -1,9 +1,11 @@
 local M = {}
 
 local log = require("fusion_post.log")
+local cnc_storage = require("fusion_post.cnc_storage")
+local utils = require("fusion_post.utils")
 
 function M.select_file(folder, callback)
-	local exts = { "js", "cnc" }
+	local exts = utils.SUPPORTED_CNC_EXTS
 	local all_files = {}
 
 	for _, ext in ipairs(exts) do
@@ -13,7 +15,7 @@ function M.select_file(folder, callback)
 	end
 
 	if #all_files == 0 then
-		print("No files found in " .. folder)
+		utils.notify_warning("No files found in " .. folder)
 		return nil
 	end
 
@@ -22,7 +24,7 @@ function M.select_file(folder, callback)
 	local lookup = {}
 
 	for _, full_path in ipairs(all_files) do
-		local name = vim.fn.fnamemodify(full_path, ":t") -- just the file name
+		local name = vim.fn.fnamemodify(full_path, ":t")
 		table.insert(items, name)
 		lookup[name] = full_path
 	end
@@ -31,13 +33,23 @@ function M.select_file(folder, callback)
 		if choice then
 			local full_path = lookup[choice]
 			log.log("User selected: " .. full_path)
+
+			-- Save selection globally
+			cnc_storage.set_global(full_path)
+
+			-- If a .cps file is currently open, also save per-file
+			local current_file = utils.get_current_cps_file()
+			if current_file then
+				cnc_storage.set_for_file(current_file, full_path)
+			end
+
 			if type(callback) == "function" then
 				callback(full_path)
 			else
-				print("Error: No valid callback function provided!") -- Debugging
+				utils.notify_error("No valid callback function provided!")
 			end
 		else
-			log.log("User cancelled file selection") -- Debugging
+			log.log("User cancelled file selection")
 		end
 	end)
 end

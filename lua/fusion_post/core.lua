@@ -4,22 +4,18 @@ local ui = require("fusion_post.ui")
 local hint = require("fusion_post.hint")
 local log = require("fusion_post.log")
 local properties = require("fusion_post.properties")
+local utils = require("fusion_post.utils")
 local previous_cnc_file = ""
 
-local function get_plugin_root()
-	local str = debug.getinfo(1, "S").source:sub(2)
-	return str:match("(.*/)")
-end
-
-local plugin_root = get_plugin_root()
+local plugin_root = utils.get_plugin_root()
 local dumper_path = plugin_root .. "dump/dump.cps"
 
-function M.run_post_processor(selected_file, opts, useDumper)
+function M.run_post_processor(selected_file, opts, useDumper, post_processor)
 	local post_exe_path = opts.post_exe_path
 
 	if selected_file == "saved" then
 		if previous_cnc_file == "" then
-			log.log("Error: No previous output")
+			utils.notify_error("No previous output")
 			return
 		else
 			selected_file = previous_cnc_file
@@ -30,32 +26,35 @@ function M.run_post_processor(selected_file, opts, useDumper)
 	previous_cnc_file = selected_file
 
 	if vim.fn.filereadable(post_exe_path) ~= 1 then
-		print("Error: post.exe path is invalid. Set it in your LazyVim config.")
+		utils.notify_error("post.exe path is invalid. Set it in your LazyVim config.")
 		return
 	end
 
-	local post_processor = vim.fn.expand("%:p")
+	-- Use provided post_processor or get from current buffer
+	if not post_processor then
+		post_processor = utils.get_current_cps_file()
+	end
+	
 	if useDumper then
 		post_processor = dumper_path
 	end
 
-	if not post_processor:match("%.cps$") then
-		print("Error: No valid post-processor (.cps) file is open.")
+	if not post_processor or not post_processor:match(utils.FILE_EXTENSIONS.cps) then
+		utils.notify_error("No valid post-processor (.cps) file is open.")
 		return
 	end
 
 	local temp_dir = os.getenv("TMPDIR")
 	local sub_dir = temp_dir .. "fusion_nvim/"
 
-	local ok, err, err_name = vim.loop.fs_mkdir(sub_dir, 448) -- 448 = 0o700 permission
+	local ok, err, err_name = vim.loop.fs_mkdir(sub_dir, utils.TEMP_DIR_PERMISSIONS)
 	if not ok and err_name ~= "EEXIST" then
-		print("Failed to create directory: " .. err)
+		utils.notify_error("Failed to create directory: " .. err)
 	end
 
-	local output_file = sub_dir .. "post.nc"
-	local debug_output_file = sub_dir .. "post-debug.nc"
+	local output_file = sub_dir .. "debug_post.nc"
 	local log_file = output_file:gsub("%.nc", ".log")
-
+	local cleaned_output_file = output_file:gsub("%.nc", "-cleaned.nc")
 	local post_options = {
 		post_exe_path,
 		post_processor,
@@ -63,7 +62,7 @@ function M.run_post_processor(selected_file, opts, useDumper)
 		output_file,
 		"--property",
 		"programName",
-		"1001",
+		opts.program_name or utils.DEFAULT_PROGRAM_NAME,
 	}
 	if opts.shorten_output then
 		table.insert(post_options, "--shorten")
@@ -82,42 +81,24 @@ function M.run_post_processor(selected_file, opts, useDumper)
 		end
 		table.insert(post_options, value_str)
 	end
+	table.insert(post_options, "--debugall")
 
 	vim.system(post_options, { text = true }, function(res)
 		if res.code == 0 and vim.fn.filereadable(output_file) == 1 then
-			-- Open preview immediately with clean output
+			M.clean_debug_output(output_file, cleaned_output_file)
 			vim.schedule(function()
-				local preview_bufnr = ui.open_preview(output_file, "gcode")
-
-				-- If not using dumper, run second pass with debug for hints
+				ui.open_preview(cleaned_output_file, "gcode")
 				if not useDumper then
-					-- Add debug flag
-					table.insert(post_options, "--debugall")
-
-					vim.system(post_options, { text = true }, function(debug_res)
-						if debug_res.code == 0 and vim.fn.filereadable(debug_output_file) == 1 then
-							-- Apply hints to the preview buffer
-							vim.schedule(function()
-								hint.add_function_hints(post_processor, output_file, debug_output_file, preview_bufnr)
-							end)
-						else
-							log.log(
-								string.format(
-									"Debug post run failed (exit code " .. debug_res.code .. "). Hints unavailable.",
-									vim.log.levels.WARN
-								)
-							)
-						end
-					end)
+					hint.add_function_hints(post_processor, cleaned_output_file, output_file)
 				end
 			end)
 		elseif vim.fn.filereadable(log_file) == 1 then
 			vim.schedule(function()
 				ui.open_preview(log_file, "text")
 			end)
-			log.log(string.format("Post failed (exit code " .. res.code .. "). Showing log.", vim.log.levels.WARN))
+			vim.notify("Post failed (exit code " .. res.code .. "). Showing log.", vim.log.levels.WARN)
 		else
-			log.log(string.format("Post failed (exit code " .. res.code .. ")", vim.log.levels.ERROR))
+			vim.notify("Post failed (exit code " .. res.code .. ")", vim.log.levels.ERROR)
 		end
 	end)
 end
@@ -125,13 +106,13 @@ end
 function M.clean_debug_output(input_file, output_file)
 	local infile = io.open(input_file, "r")
 	if not infile then
-		print("Error: Cannot open NC file for cleaning.")
+		utils.notify_error("Cannot open NC file for cleaning.")
 		return
 	end
 
 	local outfile = io.open(output_file, "w")
 	if not outfile then
-		print("Error: Cannot create cleaned NC file.")
+		utils.notify_error("Cannot create cleaned NC file.")
 		infile:close()
 		return
 	end
