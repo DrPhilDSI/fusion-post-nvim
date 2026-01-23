@@ -165,15 +165,12 @@ end
 function M.setup(opts)
 	-- Load saved settings first
 	local saved_settings = settings_storage.get_all_settings()
-	
+
 	-- Merge: defaults -> saved settings -> user opts (user opts take precedence)
 	M.options = vim.tbl_extend("force", M.options, saved_settings)
 	M.options = vim.tbl_extend("force", M.options, opts or {})
 
 	-- Validate paths
-	if vim.fn.filereadable(M.options.post_exe_path) ~= 1 then
-		utils.notify_warning("post.exe path is invalid. Set `post_exe_path` in your LazyVim config.")
-	end
 
 	if vim.fn.isdirectory(vim.fn.expand(M.options.cnc_folder)) ~= 1 then
 		utils.notify_warning("CNC folder path is invalid. Set `cnc_folder` in your LazyVim config.")
