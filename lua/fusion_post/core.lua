@@ -34,7 +34,7 @@ function M.run_post_processor(selected_file, opts, useDumper, post_processor)
 	if not post_processor then
 		post_processor = utils.get_current_cps_file()
 	end
-	
+
 	if useDumper then
 		post_processor = dumper_path
 	end
@@ -96,9 +96,9 @@ function M.run_post_processor(selected_file, opts, useDumper, post_processor)
 			vim.schedule(function()
 				ui.open_preview(log_file, "text")
 			end)
-			vim.notify("Post failed (exit code " .. res.code .. "). Showing log.", vim.log.levels.WARN)
+			log.log("Post failed (exit code " .. res.code .. "). Showing log.")
 		else
-			vim.notify("Post failed (exit code " .. res.code .. ")", vim.log.levels.ERROR)
+			log.log("Post failed (exit code " .. res.code .. ")")
 		end
 	end)
 end
