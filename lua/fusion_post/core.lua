@@ -90,7 +90,15 @@ function M.run_post_processor(selected_file, opts, useDumper, post_processor)
 			vim.schedule(function()
 				local preview_bufnr = ui.open_preview(cleaned_output_file, "gcode")
 				if not useDumper then
-					hint.add_function_hints(post_processor, cleaned_output_file, output_file)
+					hint.add_function_hints(
+						post_processor,
+						cleaned_output_file,
+						output_file,
+						preview_bufnr,
+						fusion_post.options.show_inline_hints ~= false,
+						fusion_post.options.inline_hints_filter or {},
+						fusion_post.options.call_stack_filter or {}
+					)
 
 					local call_stack_key = fusion_post.options.call_stack_key or "gK"
 					vim.api.nvim_buf_set_keymap(preview_bufnr, "n", call_stack_key, "", {

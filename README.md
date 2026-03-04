@@ -12,9 +12,9 @@ Add to your `~/.config/nvim/lua/plugins/fusion-post.lua`:
 return {
   {
     "DrPhilDSI/fusion-post-nvim",
-	dependencies = { "wilriker/gcode.vim" },
+	dependencies = { "wilberter/gcode.vim" },
 
-opts = {
+	opts = {
       post_exe_path = "C:/Program Files/Autodesk/Fusion 360/post.exe", -- Windows
       -- post_exe_path = "/Applications/Autodesk Fusion 360.app/Contents/Libraries/post.exe", -- macOS
       cnc_folder = "~/Fusion 360/NC Programs/",
@@ -22,6 +22,19 @@ opts = {
       boiler_plate_folder = "", -- For :FusionInsert
       shorten_output = false,
       line_limit = 20,
+      call_stack_key = "gK",
+      show_inline_hints = true,
+      inline_hints_filter = {
+        writeBlock = true,
+        writeLn = true,
+        writeComment = true,
+        onLinear = true,
+        onLinear5D = true,
+        onRapid = true,
+        onRapid5D = true,
+        onCircular = true,
+      },
+      call_stack_filter = {},
     },
   },
 }
@@ -51,6 +64,47 @@ The only required option is `post_exe_path` - point it to your Fusion `post.exe`
 - `shorten_output` - Show fewer lines in preview (default: `false`)
 - `line_limit` - How many lines when shortened (default: `20`)
 - `call_stack_key` - Keybinding to show call stack popup (default: `"gK"`)
+- `show_inline_hints` - Show inline hints in NC preview (default: `true`)
+- `inline_hints_filter` - Functions to exclude from inline hints (table, default: see below)
+- `call_stack_filter` - Functions to exclude from call stack popup (table, default: `{}`)
+
+### Default Filters
+
+By default, inline hints exclude these common functions:
+
+```lua
+inline_hints_filter = {
+  writeBlock = true,
+  writeLn = true,
+  writeComment = true,
+  onLinear = true,
+  onLinear5D = true,
+  onRapid = true,
+  onRapid5D = true,
+  onCircular = true,
+}
+```
+
+The call stack popup shows all functions by default (empty filter).
+
+### Customizing Filters
+
+```lua
+-- Disable inline hints completely
+require("fusion_post").setup({
+  show_inline_hints = false,
+})
+
+-- Custom inline hints filter
+require("fusion_post").setup({
+  inline_hints_filter = { onLinear = true, onRapid = true, writeBlock = true },
+})
+
+-- Filter functions from the call stack popup
+require("fusion_post").setup({
+  call_stack_filter = { onLinear = true, writeBlock = true },
+})
+```
 
 ## Commands
 
@@ -79,6 +133,22 @@ Encrypt or decrypt your post-processor. Requires `password` to be set in config.
 ### `:FusionAutoComplete`
 
 Adds a TypeScript reference for Fusion 360 globals at the top of your file. Only adds it if it's not already there.
+
+### `:FusionDebugSelectedLines`
+
+Debug selected lines in your post-processor. Select lines in visual mode, then run this command. The plugin will:
+1. Create a temporary .cps file that adds `writeln()` statements after each selected line
+2. Open the file picker to select a test .cnc file
+3. Run the temp post-processor with debug output
+4. Show the results in a preview window
+5. Delete the temp file after execution
+
+The debug output will show variable values for lines like:
+- `local x = 10;` → outputs `DEBUG: x = 10`
+- `var y = x * 2;` → outputs `DEBUG: y = 20`
+- `writeBlock("G1 X" + x);` → outputs `DEBUG: writeBlock: G1 X10`
+
+This command works best with visual line selection (`V`).
 
 ### `:FusionPostConfig [path]`
 
@@ -129,13 +199,7 @@ This helps you understand the execution flow and quickly navigate to the relevan
 		vim.keymap.set("n", "<leader>df", ":FusionPost<CR>", { desc = "Debug Fusion Post" })
 
         vim.keymap.set("n", "<leader>pf", ":FusionProperties<CR>", { desc = "Change post properties for debug" })
-```
 
-You can also customize the call stack key (default: `gK`):
-
-```lua
-opts = {
-      -- other options...
-      call_stack_key = "<leader>K",  -- custom keybinding
-    },
+		-- Debug selected lines (visual mode)
+		vim.keymap.set("v", "<leader>d", ":FusionDebugSelectedLines<CR>", { desc = "Debug selected lines" })
 ```

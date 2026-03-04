@@ -9,6 +9,18 @@ M.options = {
 	line_limit = 20,
 	program_name = "1001",
 	call_stack_key = "gK",
+	show_inline_hints = true,
+	inline_hints_filter = {
+		writeBlock = true,
+		writeLn = true,
+		writeComment = true,
+		onLinear = true,
+		onLinear5D = true,
+		onRapid = true,
+		onRapid5D = true,
+		onCircular = true,
+	},
+	call_stack_filter = {},
 }
 
 local log = require("fusion_post.log")
@@ -36,6 +48,11 @@ local function register_post_commands()
 			core.run_post_processor(selected_file, M.options, true)
 		end)
 	end, {})
+
+	vim.api.nvim_create_user_command("FusionDebugSelectedLines", function()
+		local debug_selected = require("fusion_post.debug_selected")
+		debug_selected.debug_selected_lines(M.options)
+	end, { range = true })
 end
 
 -- Register utility commands
