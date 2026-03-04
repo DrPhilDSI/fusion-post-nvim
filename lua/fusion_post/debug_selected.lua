@@ -23,6 +23,59 @@ end
 
 local function parse_and_inject_debug(lines)
 	local debug_lines = {}
+	local if_depth = 0
+	local collecting_if = false
+	local collecting_if_type = nil
+	local if_paren_depth = 0
+	local if_condition_parts = {}
+	local if_lines = {}
+	local if_quote = nil
+	local if_escape = false
+
+	local function reset_if_state()
+		collecting_if = false
+		collecting_if_type = nil
+		if_paren_depth = 0
+		if_condition_parts = {}
+		if_lines = {}
+		if_quote = nil
+		if_escape = false
+	end
+
+	local function process_if_text(text)
+		for i = 1, #text do
+			local ch = text:sub(i, i)
+
+			if if_escape then
+				table.insert(if_condition_parts, ch)
+				if_escape = false
+			elseif ch == "\\" and if_quote then
+				if_escape = true
+				table.insert(if_condition_parts, ch)
+			elseif if_quote then
+				if ch == if_quote then
+					if_quote = nil
+				end
+				table.insert(if_condition_parts, ch)
+			elseif ch == "\"" or ch == "'" then
+				if_quote = ch
+				table.insert(if_condition_parts, ch)
+			elseif ch == "(" then
+				if_paren_depth = if_paren_depth + 1
+				table.insert(if_condition_parts, ch)
+			elseif ch == ")" then
+				if_paren_depth = if_paren_depth - 1
+				if if_paren_depth == 0 then
+					return true
+				end
+				table.insert(if_condition_parts, ch)
+			else
+				table.insert(if_condition_parts, ch)
+			end
+		end
+
+		return false
+	end
 	local function split_args(arg_str)
 		local args = {}
 		local current = {}
@@ -74,14 +127,14 @@ local function parse_and_inject_debug(lines)
 
 	local function build_function_debug_line(func_name, args)
 		if #args == 0 then
-			return string.format('writeln("DEBUG: %s()");', func_name)
+			return string.format('writeln("     DEBUG: %s()");', func_name)
 		end
 
 		if #args == 1 then
-			return string.format('writeln("DEBUG: %s = " + (%s));', func_name, args[1])
+			return string.format('writeln("     DEBUG: %s = " + (%s));', func_name, args[1])
 		end
 
-		local line = string.format('writeln("DEBUG: %s = "', func_name)
+		local line = string.format('writeln("     DEBUG: %s = "', func_name)
 		for i, arg in ipairs(args) do
 			if i > 1 then
 				line = line .. ' + ", " + '
@@ -92,35 +145,190 @@ local function parse_and_inject_debug(lines)
 		return line
 	end
 
+	local function split_condition_args(condition)
+		local parts = {}
+		local current = {}
+		local depth = 0
+		local quote = nil
+		local escape = false
+		local i = 1
+
+		while i <= #condition do
+			local ch = condition:sub(i, i)
+
+			if escape then
+				table.insert(current, ch)
+				escape = false
+			elseif ch == "\\" and quote then
+				escape = true
+				table.insert(current, ch)
+			elseif quote then
+				if ch == quote then
+					quote = nil
+				end
+				table.insert(current, ch)
+			elseif ch == "\"" or ch == "'" then
+				quote = ch
+				table.insert(current, ch)
+			elseif ch == "(" then
+				depth = depth + 1
+				table.insert(current, ch)
+			elseif ch == ")" then
+				depth = math.max(depth - 1, 0)
+				table.insert(current, ch)
+			elseif depth == 0 and (condition:sub(i, i + 1) == "&&" or condition:sub(i, i + 1) == "||") then
+				local part = table.concat(current):gsub("^%s*", ""):gsub("%s*$", "")
+				if part ~= "" then
+					table.insert(parts, part)
+				end
+				current = {}
+				i = i + 2
+				goto continue
+			else
+				table.insert(current, ch)
+			end
+
+			i = i + 1
+			::continue::
+		end
+
+		local part = table.concat(current):gsub("^%s*", ""):gsub("%s*$", "")
+		if part ~= "" then
+			table.insert(parts, part)
+		end
+
+		return parts
+	end
+
+	local function emit_if_debug_lines(condition)
+		local function escape_single_quotes(text)
+			return text:gsub("'", "\\'")
+		end
+
+		local parts = split_condition_args(condition)
+		table.insert(debug_lines, "writeln('     DEBUG: ----- IF ARFGS -----');")
+		for _, part in ipairs(parts) do
+			local label = escape_single_quotes(part)
+			table.insert(debug_lines, string.format("writeln('     DEBUG: %s = ' + (%s));", label, part))
+		end
+		table.insert(debug_lines, "writeln('');")
+		table.insert(debug_lines, string.format('writeln("     DEBUG: if " + (%s) + " then");', condition))
+	end
+
+	local function emit_else_if_debug_lines(condition)
+		local function escape_single_quotes(text)
+			return text:gsub("'", "\\'")
+		end
+
+		local parts = split_condition_args(condition)
+		table.insert(debug_lines, "writeln('     DEBUG: ----- ELSE IF ARGS -----');")
+		for _, part in ipairs(parts) do
+			local label = escape_single_quotes(part)
+			table.insert(debug_lines, string.format("writeln('     DEBUG: %s = ' + (%s));", label, part))
+		end
+		table.insert(debug_lines, "writeln('');")
+		table.insert(debug_lines, string.format('writeln("     DEBUG: else if " + (%s) + " then");', condition))
+	end
+
 	for _, line in ipairs(lines) do
 		local trimmed = line:gsub("^%s*", ""):gsub("%s*$", "")
 		local stripped = trimmed:gsub("//.*$", ""):gsub("%s*$", "")
 		local ends_with_semicolon = stripped:match(";%s*$")
 		local unsafe_end = stripped:match("[{%(%[,]%s*$")
 		local can_inject = ends_with_semicolon and not unsafe_end
+		local starts_else_if = stripped:match("^else%s+if%s*%(") ~= nil
+		local starts_if = stripped:match("^if%s*%(") ~= nil
+		local starts_else = stripped:match("^else%s*{?%s*$") ~= nil
 
 		local local_match = stripped:match("^local%s+(%w+)%s*=%s*(.+)$")
 		local var_match = stripped:match("^var%s+(%w+)%s*=%s*(.+)$")
 		local assign_match = stripped:match("^(%w+)%s*=%s*(.+)$")
 		local writeln_match = stripped:match("^writeln%s*%((.+)%)$")
-		local if_match = stripped:match("^if%s*%((.+)%)%s*{?%s*$")
 		local func_name, raw_args = stripped:match("^([%w_%.]+)%s*%((.*)%)%s*;%s*$")
+
+		if collecting_if then
+			table.insert(if_lines, line)
+			local complete = process_if_text(stripped)
+			if complete then
+				local condition = table.concat(if_condition_parts):gsub("^%s*", ""):gsub("%s*$", "")
+				if collecting_if_type == "else_if" then
+					emit_else_if_debug_lines(condition)
+				else
+					emit_if_debug_lines(condition)
+				end
+				if_depth = if_depth + 1
+				for _, buffered_line in ipairs(if_lines) do
+					table.insert(debug_lines, buffered_line)
+				end
+				reset_if_state()
+			end
+			goto continue
+		end
+
+		if starts_else_if then
+			local paren_index = stripped:find("%(")
+			if paren_index then
+				reset_if_state()
+				collecting_if = true
+				collecting_if_type = "else_if"
+				if_paren_depth = 1
+				table.insert(if_lines, line)
+				local remaining = stripped:sub(paren_index + 1)
+				local complete = process_if_text(remaining)
+				if complete then
+					local condition = table.concat(if_condition_parts):gsub("^%s*", ""):gsub("%s*$", "")
+					emit_else_if_debug_lines(condition)
+					if_depth = if_depth + 1
+					for _, buffered_line in ipairs(if_lines) do
+						table.insert(debug_lines, buffered_line)
+					end
+					reset_if_state()
+				end
+				goto continue
+			end
+		end
+
+		if starts_if then
+			local paren_index = stripped:find("%(")
+			if paren_index then
+				reset_if_state()
+				collecting_if = true
+				collecting_if_type = "if"
+				if_paren_depth = 1
+				table.insert(if_lines, line)
+				local remaining = stripped:sub(paren_index + 1)
+				local complete = process_if_text(remaining)
+				if complete then
+					local condition = table.concat(if_condition_parts):gsub("^%s*", ""):gsub("%s*$", "")
+					emit_if_debug_lines(condition)
+					if_depth = if_depth + 1
+					for _, buffered_line in ipairs(if_lines) do
+						table.insert(debug_lines, buffered_line)
+					end
+					reset_if_state()
+				end
+				goto continue
+			end
+		end
+
+		if starts_else and not starts_else_if then
+			table.insert(debug_lines, 'writeln("     DEBUG: else");')
+			table.insert(debug_lines, "writeln('');")
+		end
 
 		table.insert(debug_lines, line)
 
-		if if_match then
-			table.insert(debug_lines, string.format('writeln("DEBUG: if " + (%s));', if_match))
-		elseif can_inject and local_match then
+		if can_inject and local_match then
 			local var_name = local_match
-			table.insert(debug_lines, string.format('writeln("DEBUG: %s = " + %s);', var_name, var_name))
+			table.insert(debug_lines, string.format('writeln("     DEBUG: %s = " + %s);', var_name, var_name))
 		elseif can_inject and var_match then
 			local var_name = var_match
-			table.insert(debug_lines, string.format('writeln("DEBUG: %s = " + %s);', var_name, var_name))
+			table.insert(debug_lines, string.format('writeln("     DEBUG: %s = " + %s);', var_name, var_name))
 		elseif can_inject and assign_match and not trimmed:match("^function%s+") then
 			local var_name = assign_match
 			local expr = trimmed:match("^%w+%s*=%s*(.+)$")
 			if expr then
-				table.insert(debug_lines, string.format('writeln("DEBUG: %s = " + %s);', var_name, var_name))
+				table.insert(debug_lines, string.format('writeln("     DEBUG: %s = " + %s);', var_name, var_name))
 			end
 		elseif can_inject and func_name and not writeln_match and not stripped:match("^function%s+") and not stripped:find("=") then
 			local args = split_args(raw_args or "")
@@ -128,6 +336,13 @@ local function parse_and_inject_debug(lines)
 		elseif writeln_match then
 			-- Skip writeln lines to avoid duplicate output
 		end
+
+		if stripped:match("^}%s*") and if_depth > 0 then
+			table.insert(debug_lines, 'writeln("     DEBUG: end");')
+			if_depth = if_depth - 1
+		end
+
+		::continue::
 	end
 
 	return debug_lines
@@ -184,7 +399,7 @@ function M.debug_selected_lines(opts)
 		table.insert(output_lines, original_lines[i])
 	end
 
-	for _, line in ipairs({ 'writeln("")', 'writeln("DEBUG: Selected Lines Start")', 'writeln("")' }) do
+	for _, line in ipairs({ 'writeln("")', 'writeln("     DEBUG: Selected Lines Start")', 'writeln("")' }) do
 		table.insert(output_lines, line)
 	end
 
@@ -192,7 +407,7 @@ function M.debug_selected_lines(opts)
 		table.insert(output_lines, line)
 	end
 
-	for _, line in ipairs({ 'writeln("")', 'writeln("DEBUG: Selected Lines End")', 'writeln("")' }) do
+	for _, line in ipairs({ 'writeln("")', 'writeln("     DEBUG: Selected Lines End")', 'writeln("")' }) do
 		table.insert(output_lines, line)
 	end
 
@@ -222,7 +437,8 @@ function M.debug_selected_lines(opts)
 		end
 
 		local core = require("fusion_post.core")
-		core.run_post_processor(selected_nc_file, opts, false, temp_cps)
+		local run_opts = vim.tbl_extend("force", {}, opts, { show_inline_hints = false })
+		core.run_post_processor(selected_nc_file, run_opts, false, temp_cps)
 	end)
 end
 
