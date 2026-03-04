@@ -50,6 +50,7 @@ The only required option is `post_exe_path` - point it to your Fusion `post.exe`
 - `boiler_plate_folder` - Template files for `:FusionInsert`
 - `shorten_output` - Show fewer lines in preview (default: `false`)
 - `line_limit` - How many lines when shortened (default: `20`)
+- `call_stack_key` - Keybinding to show call stack popup (default: `"gK"`)
 
 ## Commands
 
@@ -95,6 +96,12 @@ Change plugin settings like `Program name` `shorten_output` and `line_limit` on 
 
 Open a `.cps` file, run `:FusionPost` to pick a test file, then just edit and save. The post-processor runs automatically on each save. Use `:FusionProperties` to tweak properties, `:FusionDeploy` to create versioned copies, and `:FusionEncrypt` if you need to protect your code.
 
+### Call Stack Navigation
+
+When viewing the NC output preview, you can press the `call_stack_key` (default: `gK`) on any line with a hint to see the full call stack. A popup menu will show all the functions in the call stack (from top-level to the immediate caller). Select any function to jump directly to that line in your `.cps` file.
+
+This helps you understand the execution flow and quickly navigate to the relevant code when debugging your post-processor.
+
 ## Troubleshooting
 
 **"post.exe path is invalid"** - Make sure you're using the full absolute path to `post.exe`.
@@ -122,4 +129,13 @@ Open a `.cps` file, run `:FusionPost` to pick a test file, then just edit and sa
 		vim.keymap.set("n", "<leader>df", ":FusionPost<CR>", { desc = "Debug Fusion Post" })
 
         vim.keymap.set("n", "<leader>pf", ":FusionProperties<CR>", { desc = "Change post properties for debug" })
+```
+
+You can also customize the call stack key (default: `gK`):
+
+```lua
+opts = {
+      -- other options...
+      call_stack_key = "<leader>K",  -- custom keybinding
+    },
 ```

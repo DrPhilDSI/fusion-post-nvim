@@ -5,6 +5,7 @@ local hint = require("fusion_post.hint")
 local log = require("fusion_post.log")
 local properties = require("fusion_post.properties")
 local utils = require("fusion_post.utils")
+local fusion_post = require("fusion_post.init")
 local previous_cnc_file = ""
 
 local plugin_root = utils.get_plugin_root()
@@ -87,9 +88,19 @@ function M.run_post_processor(selected_file, opts, useDumper, post_processor)
 		if res.code == 0 and vim.fn.filereadable(output_file) == 1 then
 			M.clean_debug_output(output_file, cleaned_output_file)
 			vim.schedule(function()
-				ui.open_preview(cleaned_output_file, "gcode")
+				local preview_bufnr = ui.open_preview(cleaned_output_file, "gcode")
 				if not useDumper then
 					hint.add_function_hints(post_processor, cleaned_output_file, output_file)
+
+					local call_stack_key = fusion_post.options.call_stack_key or "gK"
+					vim.api.nvim_buf_set_keymap(preview_bufnr, "n", call_stack_key, "", {
+						callback = function()
+							hint.show_call_stack_popup(post_processor, preview_bufnr)
+						end,
+						noremap = true,
+						silent = true,
+						desc = "Show call stack popup",
+					})
 				end
 			end)
 		elseif vim.fn.filereadable(log_file) == 1 then

@@ -1,13 +1,14 @@
 local M = {}
 
 M.options = {
-	post_exe_path = "", -- User should define in LazyVim setup
-	cnc_folder = "~/Fusion 360/NC Programs/", -- Default CNC folder
-	password = "", -- Password for encrypting
+	post_exe_path = "",
+	cnc_folder = "~/Fusion 360/NC Programs/",
+	password = "",
 	boiler_plate_folder = "",
 	shorten_output = false,
 	line_limit = 20,
 	program_name = "1001",
+	call_stack_key = "gK",
 }
 
 local log = require("fusion_post.log")

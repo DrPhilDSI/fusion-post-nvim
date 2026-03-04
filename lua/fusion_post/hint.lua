@@ -3,6 +3,7 @@ local M = {}
 local log = require("fusion_post.log")
 
 M.hint_data = {}
+M.cps_file = nil
 
 function M.extract_function_definitions(cps_file)
 	local functions = {}
@@ -18,7 +19,6 @@ function M.extract_function_definitions(cps_file)
 	for line in file:lines() do
 		line_number = line_number + 1
 
-		-- Look for function definitions (e.g., `function writeWCS()`)
 		local function_name = line:match("function%s+([%w_]+)%s*%(")
 		if function_name then
 			functions[line_number] = function_name
@@ -38,7 +38,7 @@ local function find_closest_function(cps_line_number, function_definitions, sort
 		if defined_line <= cps_line_number then
 			closest_function = function_definitions[defined_line]
 		else
-			break -- Stop once we pass the target line
+			break
 		end
 	end
 
@@ -74,15 +74,15 @@ function M.extract_function_hints(debug_nc_file, cps_file)
 			local function_name = find_closest_function(cps_line_number, function_definitions, sorted_line_numbers)
 
 			if function_name and not skip_functions[function_name] then
-				local function_line = string.format("%s ln:%d", function_name, cps_line_number)
-				table.insert(function_stack, function_line)
+				table.insert(function_stack, { name = function_name, line = cps_line_number })
 			end
 		end
 
 		if not line:match("!DEBUG") then
 			nc_line_number = nc_line_number + 1
-			hints[nc_line_number] = function_stack[1] -- table.concat(function_stack, " → ")
-			print(hints[nc_line_number])
+			if #function_stack > 0 then
+				hints[nc_line_number] = vim.deepcopy(function_stack)
+			end
 			function_stack = {}
 		end
 	end
@@ -92,7 +92,6 @@ function M.extract_function_hints(debug_nc_file, cps_file)
 end
 
 function M.add_function_hints(cps_file, clean_nc_file, debug_nc_file, bufnr)
-	-- Use provided bufnr, or fall back to current buffer
 	if not bufnr then
 		bufnr = vim.fn.bufnr("%")
 	end
@@ -100,12 +99,14 @@ function M.add_function_hints(cps_file, clean_nc_file, debug_nc_file, bufnr)
 		return
 	end
 
-	-- Extract function hints from debug NC file
+	M.cps_file = cps_file
 	local hints = M.extract_function_hints(debug_nc_file, cps_file)
 	if not hints or vim.tbl_isempty(hints) then
 		log.log("No function hints found.")
 		return
 	end
+
+	M.hint_data = hints
 
 	local nc_file = io.open(clean_nc_file, "r")
 	if not nc_file then
@@ -117,18 +118,82 @@ function M.add_function_hints(cps_file, clean_nc_file, debug_nc_file, bufnr)
 
 	for line in nc_file:lines() do
 		line_number = line_number + 1
-		local function_name = hints[line_number]
+		local function_stack = hints[line_number]
 
-		-- Ensure the line exists in the NC buffer
-		if function_name then
+		if function_stack and #function_stack > 0 then
+			local first_func = function_stack[1]
+			local hint_text = string.format(" → %s at ln:%d", first_func.name, first_func.line)
 			vim.api.nvim_buf_set_extmark(bufnr, vim.api.nvim_create_namespace("FusionPostHints"), line_number - 1, 0, {
-				virt_text = { { " → " .. function_name, "Comment" } },
+				virt_text = { { hint_text, "Comment" } },
 				virt_text_pos = "eol",
 			})
 		else
 			log.log(string.format("Skipping invalid hint line: %s", line))
 		end
 	end
+end
+
+function M.get_call_stack(nc_line_number)
+	return M.hint_data[nc_line_number] or nil
+end
+
+function M.jump_to_cps_line(cps_file, line_number)
+	if not cps_file or cps_file == "" then
+		vim.notify("No .cps file associated with this preview.", vim.log.levels.ERROR)
+		return
+	end
+
+	if vim.fn.filereadable(cps_file) ~= 1 then
+		vim.notify("Cannot find .cps file: " .. cps_file, vim.log.levels.ERROR)
+		return
+	end
+
+	local cps_bufnr = vim.fn.bufnr(cps_file)
+	if cps_bufnr == -1 then
+		vim.cmd("edit " .. vim.fn.fnameescape(cps_file))
+		cps_bufnr = vim.api.nvim_get_current_buf()
+	else
+		local cps_win = vim.fn.bufwinid(cps_bufnr)
+		if cps_win == -1 then
+			vim.cmd("sbuffer " .. cps_bufnr)
+		else
+			vim.api.nvim_set_current_win(cps_win)
+		end
+	end
+
+	if line_number and line_number > 0 then
+		vim.api.nvim_win_set_cursor(0, { line_number, 0 })
+		vim.cmd("normal! zvzz")
+	end
+end
+
+function M.show_call_stack_popup(cps_file, nc_bufnr)
+	local nc_line = vim.api.nvim_win_get_cursor(0)[1]
+	local call_stack = M.get_call_stack(nc_line)
+
+	if not call_stack or #call_stack == 0 then
+		vim.notify("No call stack available for NC line " .. nc_line, vim.log.levels.INFO)
+		return
+	end
+
+	local items = {}
+	for i, func in ipairs(call_stack) do
+		table.insert(items, string.format("%s at line %d", func.name, func.line))
+	end
+
+	vim.ui.select(items, {
+		prompt = "Select function to jump to (NC line " .. nc_line .. "):",
+	}, function(choice)
+		if choice then
+			for i, item in ipairs(items) do
+				if item == choice then
+					local selected = call_stack[i]
+					M.jump_to_cps_line(cps_file, selected.line)
+					break
+				end
+			end
+		end
+	end)
 end
 
 return M
