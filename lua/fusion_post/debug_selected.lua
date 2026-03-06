@@ -134,7 +134,7 @@ local function parse_and_inject_debug(lines)
 			return string.format('writeln("     DEBUG: %s = " + (%s));', func_name, args[1])
 		end
 
-		local line = string.format('writeln("     DEBUG: %s = "', func_name)
+		local line = string.format('writeln("     DEBUG: %s = " + ', func_name)
 		for i, arg in ipairs(args) do
 			if i > 1 then
 				line = line .. ' + ", " + '
