@@ -206,7 +206,7 @@ local function parse_and_inject_debug(lines)
 		end
 
 		local parts = split_condition_args(condition)
-		table.insert(debug_lines, "writeln('     DEBUG: ----- IF ARFGS -----');")
+		table.insert(debug_lines, "writeln('     DEBUG: ----- IF ARGS -----');")
 		for _, part in ipairs(parts) do
 			local label = escape_single_quotes(part)
 			table.insert(debug_lines, string.format("writeln('     DEBUG: %s = ' + (%s));", label, part))
