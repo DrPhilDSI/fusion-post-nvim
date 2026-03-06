@@ -363,6 +363,29 @@ local function create_temp_debug_cps(output_lines, output_path)
 	return output_path
 end
 
+local function get_machine_state_debug_lines()
+	return {
+		'writeln("")',
+		'writeln("     DEBUG: ----- MACHINE STATE -----")',
+		'if (typeof machineState !== "undefined") {',
+		'  for (var key in machineState) {',
+		'    if (typeof machineState[key] != "function") {',
+		'      writeln("     DEBUG: machineState." + key + " = " + machineState[key]);',
+		'    }',
+		'  }',
+		'} else if (typeof state !== "undefined") {',
+		'  for (var key in state) {',
+		'    if (typeof state[key] != "function") {',
+		'      writeln("     DEBUG: state." + key + " = " + state[key]);',
+		'    }',
+		'  }',
+		'} else {',
+		'  writeln("     DEBUG: no machineState/state found");',
+		'}',
+		'writeln("")',
+	}
+end
+
 function M.debug_selected_lines(opts)
 	local current_file = utils.get_current_cps_file()
 	if not current_file then
@@ -393,52 +416,68 @@ function M.debug_selected_lines(opts)
 	original_cps:close()
 
 	local debug_injected_lines = parse_and_inject_debug(selected_lines)
-	local output_lines = {}
 
-	for i = 1, start_line - 1 do
-		table.insert(output_lines, original_lines[i])
-	end
-
-	for _, line in ipairs({ 'writeln("")', 'writeln("     DEBUG: Selected Lines Start")', 'writeln("")' }) do
-		table.insert(output_lines, line)
-	end
-
-	for _, line in ipairs(debug_injected_lines) do
-		table.insert(output_lines, line)
-	end
-
-	for _, line in ipairs({ 'writeln("")', 'writeln("     DEBUG: Selected Lines End")', 'writeln("")' }) do
-		table.insert(output_lines, line)
-	end
-
-	for i = end_line + 1, #original_lines do
-		table.insert(output_lines, original_lines[i])
-	end
-
-	local temp_dir = os.getenv("TMPDIR") .. "fusion_nvim/"
-	local ok = vim.loop.fs_mkdir(temp_dir, tonumber("755", 8))
-	if not ok then
-		-- Directory might already exist, that's ok
-	end
-
-	local temp_cps = temp_dir .. "debug_selected.cps"
-	local result = create_temp_debug_cps(output_lines, temp_cps)
-	if not result then
-		return
-	end
-
-	log.log("Created temp debug file: " .. temp_cps)
-
-	ui.select_file(opts.cnc_folder, function(selected_nc_file)
-		if not selected_nc_file then
-			vim.notify("No NC file selected.", vim.log.levels.WARN)
-			vim.loop.fs_unlink(temp_cps)
+	vim.ui.select({ "Yes", "No" }, {
+		prompt = "Debug selected lines: check machine state?",
+	}, function(choice)
+		if not choice then
 			return
 		end
 
-		local core = require("fusion_post.core")
-		local run_opts = vim.tbl_extend("force", {}, opts, { show_inline_hints = false })
-		core.run_post_processor(selected_nc_file, run_opts, false, temp_cps)
+		local include_machine_state = choice == "Yes"
+		local output_lines = {}
+
+		for i = 1, start_line - 1 do
+			table.insert(output_lines, original_lines[i])
+		end
+
+		if include_machine_state then
+			for _, line in ipairs(get_machine_state_debug_lines()) do
+				table.insert(output_lines, line)
+			end
+		end
+
+		for _, line in ipairs({ 'writeln("")', 'writeln("     DEBUG: Selected Lines Start")', 'writeln("")' }) do
+			table.insert(output_lines, line)
+		end
+
+		for _, line in ipairs(debug_injected_lines) do
+			table.insert(output_lines, line)
+		end
+
+		for _, line in ipairs({ 'writeln("")', 'writeln("     DEBUG: Selected Lines End")', 'writeln("")' }) do
+			table.insert(output_lines, line)
+		end
+
+		for i = end_line + 1, #original_lines do
+			table.insert(output_lines, original_lines[i])
+		end
+
+		local temp_dir = os.getenv("TMPDIR") .. "fusion_nvim/"
+		local ok = vim.loop.fs_mkdir(temp_dir, tonumber("755", 8))
+		if not ok then
+			-- Directory might already exist, that's ok
+		end
+
+		local temp_cps = temp_dir .. "debug_selected.cps"
+		local result = create_temp_debug_cps(output_lines, temp_cps)
+		if not result then
+			return
+		end
+
+		log.log("Created temp debug file: " .. temp_cps)
+
+		ui.select_file(opts.cnc_folder, function(selected_nc_file)
+			if not selected_nc_file then
+				vim.notify("No NC file selected.", vim.log.levels.WARN)
+				vim.loop.fs_unlink(temp_cps)
+				return
+			end
+
+			local core = require("fusion_post.core")
+			local run_opts = vim.tbl_extend("force", {}, opts, { show_inline_hints = false })
+			core.run_post_processor(selected_nc_file, run_opts, false, temp_cps)
+		end)
 	end)
 end
 
